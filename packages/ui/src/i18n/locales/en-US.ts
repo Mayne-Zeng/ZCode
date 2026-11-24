@@ -4076,6 +4076,10 @@ const enUS: Record<string, string> = {
     "Show full reasoning inside the message stream. When off, the first reasoning item in each turn remains visible.",
   "settings.messageStreamShowTodos": "Show todos",
   "settings.messageStreamShowTodosDescription": "Show Todo tool cards inside the message stream. ",
+  "settings.composerInputPrediction": "Composer input prediction",
+  "settings.composerInputPredictionDescription":
+    "After a turn ends, show a predicted next-step prompt in the composer. Accept with Tab or click. Each prediction makes one extra model call. ",
+
   "settings.zcodeInteractionBehavior": "Interaction behavior",
   "settings.zcodeInteractionBehaviorDescription":
     "While ZCode is running, add follow-up actions to the queue or guide them to run after the next tool call.",

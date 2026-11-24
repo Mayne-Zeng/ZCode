@@ -2202,6 +2202,8 @@ export function SessionPane({
   const appFollowupMode = resolveAppFollowupMode(sharedSettings);
   const messageStreamShowReasoning = sharedSettings?.messageStreamShowReasoning ?? true;
   const messageStreamShowTodos = sharedSettings?.messageStreamShowTodos ?? false;
+  // 回合结束后在输入框显示下一步预测（spec：docs/composer-input-prediction.md）。
+  const composerInputPredictionEnabled = sharedSettings?.composerInputPredictionEnabled ?? true;
   const snapshotSessionId = snapshot?.sessionId ?? null;
   const snapshotFollowupMode = snapshot?.config.followupMode ?? null;
   const snapshotRevision = snapshot?.revision ?? null;
@@ -6374,6 +6376,7 @@ export function SessionPane({
       statusContent={showQuotaBanner ? null : statusCapsules}
       queueContent={blockingInteractionId ? null : queueNode}
       key="conversation-composer"
+      composerInputPredictionEnabled={composerInputPredictionEnabled}
       // Snapshot 仍服务用量、路由与运行态；工具栏的 mode/model 只读下方 Composer Draft。
       snapshot={snapshot}
       inputPending={state.optimisticCommands.some((command) =>

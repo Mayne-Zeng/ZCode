@@ -341,6 +341,8 @@ export interface AppSettings {
   messageStreamShowReasoningMigrationInitialized?: boolean;
   /** 是否在消息流中展示 todo 工具渲染；不影响摘要面板的 todo */
   messageStreamShowTodos?: boolean;
+  /** 回合结束后在输入框显示下一步预测（ghost hint）；缺席按开启兼容旧配置（spec：docs/composer-input-prediction.md）。 */
+  composerInputPredictionEnabled?: boolean;
   /** ZCode 运行中继续输入时，是排队到下一轮，还是引导到下一次工具调用后运行 */
   zcodeInteractionBehavior?: ZCodeInteractionBehavior;
   /** Agent 提问五分钟无人回答时是否允许自动继续；缺失按开启兼容旧配置。 */

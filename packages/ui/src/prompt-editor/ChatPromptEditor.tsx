@@ -83,6 +83,9 @@ export function ChatPromptEditor({
   onUserInputClear,
   onUserInputPresenceChange,
   onUserInputStart,
+  ghostHint,
+  onGhostHintAccept,
+  onGhostHintDismiss,
   onSubmit,
   onModifiedSubmit,
   onCancel,
@@ -153,6 +156,10 @@ export function ChatPromptEditor({
   onUserInputClear?: () => void;
   onUserInputPresenceChange?: (presence: UserInputPresence) => void;
   onUserInputStart?: () => void;
+  /** 回合结束预测的 ghost hint；透传给 LexicalChatInput（spec：docs/composer-input-prediction.md）。 */
+  ghostHint?: string | null;
+  onGhostHintAccept?: () => void;
+  onGhostHintDismiss?: () => void;
   // 适配：返回 false 表示业务层拒绝/延迟本次提交，Lexical 不自行 reset（草稿保留）。
   onSubmit: (value: string) => boolean | void;
   onModifiedSubmit?: (value: string) => boolean | void;
@@ -360,6 +367,9 @@ export function ChatPromptEditor({
       <LexicalChatInput
         extraPlugins={extraPlugins}
         placeholder={placeholder}
+        ghostHint={ghostHint}
+        onGhostHintAccept={onGhostHintAccept}
+        onGhostHintDismiss={onGhostHintDismiss}
         disabled={disabled}
         submitDisabled={submitDisabled}
         allowSubmitWhenEmpty={allowSubmitWhenEmpty}

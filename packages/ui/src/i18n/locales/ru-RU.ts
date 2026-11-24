@@ -3703,6 +3703,9 @@ const ruRU: Record<string, string> = {
   "settings.messageStreamShowTodos": "Показывать задачи Todo",
   "settings.messageStreamShowTodosDescription":
     "Показывать карточки инструмента Todo в ленте сообщений. ",
+  "settings.composerInputPrediction": "Предсказание ввода",
+  "settings.composerInputPredictionDescription":
+    "После завершения хода показывает подсказку со следующим шагом в поле ввода. Принять — Tab или клик. Каждый прогноз вызывает модель один раз. ",
   "settings.toolGroupingExplore": "Группировать инструменты исследования",
   "settings.toolGroupingExploreDescription":
     "Объединять последовательные чтения и поиски в раздел «Исследование».",

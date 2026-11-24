@@ -3635,6 +3635,9 @@ const koKR: Record<string, string> = {
     "메시지 스트림에 전체 추론을 표시합니다. 끄면 각 턴의 첫 번째 추론 항목만 표시됩니다.",
   "settings.messageStreamShowTodos": "할 일 표시",
   "settings.messageStreamShowTodosDescription": "메시지 스트림에 Todo 도구 카드를 표시합니다. ",
+  "settings.composerInputPrediction": "입력창 예측",
+  "settings.composerInputPredictionDescription":
+    "턴이 끝나면 입력창에 다음 단계 예측 프롬프트를 표시합니다. Tab 또는 클릭으로 채택합니다. 예측당 모델을 한 번 호출합니다. ",
   "settings.toolGroupingExplore": "탐색 도구 그룹화",
   "settings.toolGroupingExploreDescription": "연속된 읽기와 검색을 탐색 섹션으로 묶습니다.",
   "settings.toolGroupingTerminal": "터미널 명령 그룹화",

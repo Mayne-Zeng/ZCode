@@ -3730,6 +3730,9 @@ const jaJP: Record<string, string> = {
   "settings.messageStreamShowTodos": "ToDo を表示",
   "settings.messageStreamShowTodosDescription":
     "メッセージストリームに ToDo ツールのカードを表示します。",
+  "settings.composerInputPrediction": "入力予測",
+  "settings.composerInputPredictionDescription":
+    "ターン終了後、入力欄に次のステップの予測プロンプトを表示します。Tab またはクリックで採用。予測ごとにモデルを 1 回呼び出します。",
   "settings.toolGroupingExplore": "探索ツールをグループ化",
   "settings.toolGroupingExploreDescription":
     "連続する読み取りと検索を「探索」セクションにまとめます。",

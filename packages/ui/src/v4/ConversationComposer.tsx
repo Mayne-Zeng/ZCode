@@ -108,6 +108,7 @@ import {
   useVoiceInputShortcut,
   VoiceInputButton,
 } from "@/voice-input/index.js";
+import { useComposerInputPrediction } from "@/v4/composer/useComposerInputPrediction.js";
 import { ImagePreviewDialog } from "@/components/ai-elements/image-preview-dialog.js";
 import {
   ChatMediaAttachmentPreviewDialog,
@@ -120,6 +121,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { advanceComposerDraftRevision } from "@/v4/composer/composerDraftRevision.js";
 import type { AppSlashCommand } from "@/slashCommandHelpers.js";
 import { useOptionalServices } from "@/hooks/useServices.js";
+import { useZCodeAgentService } from "@/hooks/useZCodeAgentService.js";
 import { logger } from "@/logger.js";
 import { runUserAction, startUserAction } from "@/lib/userActionTelemetry.js";
 import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
@@ -463,6 +465,8 @@ export interface ConversationComposerProps {
   ownsKeyboardShortcut?: (event: KeyboardEvent) => boolean;
   /** 当前 composer 是否运行在手机 Web 远控壳中。 */
   isWebRemoteControl?: boolean;
+  /** 回合结束后在输入框显示下一步预测（spec：docs/composer-input-prediction.md）；缺席按开启。 */
+  composerInputPredictionEnabled?: boolean;
   workspacePath: string;
   workspaceIdentity?: string;
   /** 受管 worktree 任务的会话 cwd；Hook 待审核入口据此让设置页按 worktree 发现（D23）。 */
@@ -605,6 +609,7 @@ function ConversationComposerImpl({
   autoFocusEnabled = true,
   ownsKeyboardShortcut,
   isWebRemoteControl = false,
+  composerInputPredictionEnabled = true,
   workspacePath,
   workspaceIdentity,
   worktreeCwd,
@@ -793,6 +798,31 @@ function ConversationComposerImpl({
       composerMountedRef.current = false;
     };
   }, []);
+  // 回合结束后在输入框显示下一步预测（spec：docs/composer-input-prediction.md）。
+  // 采纳走 appendText：候选本就是「接在草稿后面的文本」，不 trim、保留英文前导空格。
+  const composerAgentService = useZCodeAgentService(
+    workspacePath,
+    remoteSessionId,
+    workspaceIdentity,
+  );
+  const appendPredictionText = useCallback((text: string) => {
+    inputApiRef.current?.appendText(text);
+    inputApiRef.current?.focus();
+  }, []);
+  const composerInputPrediction = useComposerInputPrediction({
+    // composer 被禁用（reject/recovery 等模式）或正在提交（草稿已清、运行态尚未翻转的窗口）时不预测。
+    enabled: composerInputPredictionEnabled && !disabled && !inputPending && !pending,
+    sessionId,
+    running: snapshot?.control.canStop === true,
+    composerEmpty: !textPresence.trimmed,
+    revision: snapshot?.revision,
+    snapshotSessionId: snapshot?.sessionId,
+    workspacePath,
+    workspaceIdentity,
+    remoteSessionId,
+    service: composerAgentService,
+    acceptText: appendPredictionText,
+  });
   const commandResolutionCleanupsRef = useRef(new Set<() => void>());
   const reportedErrorKeysRef = useRef(new Set<string>());
   const isMobileTextInputViewport = useIsMobileTextInputViewport();
@@ -3050,6 +3080,9 @@ function ConversationComposerImpl({
               ? normalPlaceholder
               : intl.formatMessage({ id: "remote.conversation.sendUnavailable" })
           }
+          ghostHint={composerInputPrediction.hint}
+          onGhostHintAccept={composerInputPrediction.accept}
+          onGhostHintDismiss={composerInputPrediction.dismiss}
           disabled={disabled || (mode === "reject" && !recoveryAvailable)}
           submitting={pending}
           submitDisabled={

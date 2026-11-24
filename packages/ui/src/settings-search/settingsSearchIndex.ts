@@ -194,6 +194,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     visibility: "all",
   },
   {
+    id: "settings.composerInputPrediction",
+    section: "agentBehavior",
+    description: "settings.composerInputPredictionDescription",
+    visibility: "all",
+  },
+  {
     id: "settings.themeMode",
     section: "appearance",
     description: "settings.themeModeDescription",

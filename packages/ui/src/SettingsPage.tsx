@@ -862,6 +862,7 @@ export function SettingsPage({
   const [autoDownloadAndInstallUpdates, setAutoDownloadAndInstallUpdates] = useState(false);
   const [messageStreamShowReasoning, setMessageStreamShowReasoning] = useState(true);
   const [messageStreamShowTodos, setMessageStreamShowTodos] = useState(false);
+  const [composerInputPredictionEnabled, setComposerInputPredictionEnabled] = useState(true);
   const [zcodeInteractionBehavior, setZCodeInteractionBehavior] =
     useState<ZCodeInteractionBehavior>("queue");
   const [defaultHomeDir, setDefaultHomeDir] = useState("");
@@ -996,6 +997,7 @@ export function SettingsPage({
     }
     setMessageStreamShowReasoning(sharedSettings.messageStreamShowReasoning ?? true);
     setMessageStreamShowTodos(sharedSettings.messageStreamShowTodos ?? false);
+    setComposerInputPredictionEnabled(sharedSettings.composerInputPredictionEnabled ?? true);
     setZCodeInteractionBehavior(sharedSettings.zcodeInteractionBehavior ?? "queue");
     setReceivePreviewUpdates(sharedSettings.receivePreviewUpdates ?? false);
     setAutoDownloadAndInstallUpdates(sharedSettings.autoDownloadAndInstallUpdates ?? false);
@@ -1409,6 +1411,22 @@ export function SettingsPage({
         },
       });
       setMessageStreamShowTodos(enabled);
+    },
+    [updateSharedSettings],
+  );
+  const handleComposerInputPredictionEnabledChange = useCallback(
+    async (enabled: boolean) => {
+      await runSettingsActionAsync({
+        featureId: "settings.conversation",
+        action: "toggle_composer_input_prediction",
+        trigger: "switch",
+        operation: () => updateSharedSettings({ composerInputPredictionEnabled: enabled }),
+        completed: {
+          resultSource: "shared_settings",
+          stateAfter: enabled ? "enabled" : "disabled",
+        },
+      });
+      setComposerInputPredictionEnabled(enabled);
     },
     [updateSharedSettings],
   );
@@ -1951,6 +1969,10 @@ export function SettingsPage({
                                 handleMessageStreamShowReasoningChange
                               }
                               onMessageStreamShowTodosChange={handleMessageStreamShowTodosChange}
+                              composerInputPredictionEnabled={composerInputPredictionEnabled}
+                              onComposerInputPredictionEnabledChange={
+                                handleComposerInputPredictionEnabledChange
+                              }
                               onZCodeInteractionBehaviorChange={
                                 handleZCodeInteractionBehaviorChange
                               }

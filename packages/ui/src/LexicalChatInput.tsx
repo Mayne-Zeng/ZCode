@@ -15,6 +15,7 @@
  * 3. mention 面板用 enableMentionPanel 控制；slash command 始终读取 CLI workspace catalog。
  */
 import { $getPromptMarkdown } from "@/mentions/promptSerialization.js";
+import { ControlShortcutBadge } from "@/ControlShortcutBadge.js";
 import { PromptClipboardPlugin } from "@/mentions/PromptClipboardPlugin.js";
 import {
   resolveComposerKeyAction,
@@ -1665,6 +1666,10 @@ function EditorApiPlugin({
 
 interface LexicalChatInputProps {
   placeholder?: string;
+  /** 回合结束预测的下一步提示（ghost hint）；非空时隐藏 placeholder，Tab/点击采纳（spec：docs/composer-input-prediction.md）。 */
+  ghostHint?: string | null;
+  onGhostHintAccept?: () => void;
+  onGhostHintDismiss?: () => void;
   disabled?: boolean;
   submitDisabled?: boolean;
   allowSubmitWhenEmpty?: boolean;
@@ -1704,6 +1709,9 @@ const EDITOR_THEME = {
 
 export function LexicalChatInput({
   placeholder,
+  ghostHint,
+  onGhostHintAccept,
+  onGhostHintDismiss,
   disabled = false,
   submitDisabled = false,
   allowSubmitWhenEmpty = false,
@@ -1802,24 +1810,53 @@ export function LexicalChatInput({
   // Lexical 的 ContentEditable props 是一个互斥联合类型，
   // aria-placeholder 一旦出现就要求 placeholder 同时存在。
   // 之前直接写三元 JSX，TypeScript 在合并两条分支时没有正确保留这组联动约束，导致误报缺少 placeholder。
-  const contentEditableProps: React.ComponentProps<typeof ContentEditable> = placeholder
-    ? {
-        "aria-placeholder": placeholder,
-        placeholder: (
-          <div
-            className={`pointer-events-none absolute left-0 top-0 ${compactPlaceholder ? "line-clamp-2" : ""} ${resolveMobileInputTextSizeClassName(
-              {
-                avoidIosInputFocusZoom,
-              },
-            )} text-foreground-subtlest`}
-          >
-            {placeholder}
-          </div>
-        ),
-      }
-    : {
-        placeholder: null,
-      };
+  // ghost hint 与 placeholder 同位（左上角），hint 可见时整体隐藏 placeholder 避免文字重叠。
+  const contentEditableProps: React.ComponentProps<typeof ContentEditable> =
+    placeholder && !ghostHint
+      ? {
+          "aria-placeholder": placeholder,
+          placeholder: (
+            <div
+              className={`pointer-events-none absolute left-0 top-0 ${compactPlaceholder ? "line-clamp-2" : ""} ${resolveMobileInputTextSizeClassName(
+                {
+                  avoidIosInputFocusZoom,
+                },
+              )} text-foreground-subtlest`}
+            >
+              {placeholder}
+            </div>
+          ),
+        }
+      : {
+          placeholder: null,
+        };
+
+  // ghost hint 可见时拦截：无修饰键 Tab 采纳、Escape 清除（输入清除由上层 presence 变化处理）。
+  // capture 阶段先于 Lexical 键盘插件，避免按键落进编辑器默认行为。
+  const handleGhostKeyDown = (event: React.KeyboardEvent) => {
+    if (!ghostHint) return;
+    if (
+      event.key === "Escape" &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      onGhostHintDismiss?.();
+      return;
+    }
+    if (!onGhostHintAccept) return;
+    if (event.key !== "Tab" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    if (event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onGhostHintAccept();
+  };
 
   const contentEditable = (
     <ContentEditable
@@ -1851,8 +1888,27 @@ export function LexicalChatInput({
   return (
     <div className="relative flex-1">
       <LexicalComposer initialConfig={initialConfig}>
-        <div className="relative">
+        <div className="relative" onKeyDownCapture={handleGhostKeyDown}>
           <PlainTextPlugin contentEditable={contentEditable} ErrorBoundary={LexicalErrorBoundary} />
+          {ghostHint ? (
+            // 与 placeholder 同位的幽灵文本层：正文部分不拦截编辑器点击，仅 Tab 键帽可点击采纳。
+            // spec：docs/composer-input-prediction.md「UI」。
+            <div className="pointer-events-none absolute left-0 top-0 flex min-w-0 items-center gap-1.5">
+              <span
+                className={`min-w-0 truncate ${resolveMobileInputTextSizeClassName({
+                  avoidIosInputFocusZoom,
+                })} text-foreground-subtle`}
+              >
+                {ghostHint}
+              </span>
+              <ControlShortcutBadge
+                className={onGhostHintAccept ? "pointer-events-auto cursor-pointer" : undefined}
+                onClick={onGhostHintAccept}
+              >
+                Tab
+              </ControlShortcutBadge>
+            </div>
+          ) : null}
           <HistoryPlugin />
           <PromptClipboardPlugin />
           <TextContentPlugin

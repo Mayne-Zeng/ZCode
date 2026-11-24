@@ -874,6 +874,7 @@ export function AgentBehaviorSectionContent({
   agentAlwaysBackgroundEnabled = true,
   messageStreamShowReasoning,
   messageStreamShowTodos,
+  composerInputPredictionEnabled = true,
   zcodeInteractionBehavior,
   askUserQuestionAutoResolutionEnabled = true,
   modelIoFullRetentionEnabled = false,
@@ -882,6 +883,7 @@ export function AgentBehaviorSectionContent({
   onAgentAlwaysBackgroundEnabledChange = async () => {},
   onMessageStreamShowReasoningChange,
   onMessageStreamShowTodosChange,
+  onComposerInputPredictionEnabledChange = async () => {},
   onZCodeInteractionBehaviorChange,
   onAskUserQuestionAutoResolutionEnabledChange = async () => {},
   onModelIoFullRetentionEnabledChange = async () => {},
@@ -894,6 +896,7 @@ export function AgentBehaviorSectionContent({
   agentAlwaysBackgroundEnabled?: boolean;
   messageStreamShowReasoning: boolean;
   messageStreamShowTodos: boolean;
+  composerInputPredictionEnabled?: boolean;
   zcodeInteractionBehavior: ZCodeInteractionBehavior;
   askUserQuestionAutoResolutionEnabled?: boolean;
   modelIoFullRetentionEnabled?: boolean;
@@ -902,6 +905,7 @@ export function AgentBehaviorSectionContent({
   onAgentAlwaysBackgroundEnabledChange?: (enabled: boolean) => Promise<void>;
   onMessageStreamShowReasoningChange: (enabled: boolean) => Promise<void>;
   onMessageStreamShowTodosChange: (enabled: boolean) => Promise<void>;
+  onComposerInputPredictionEnabledChange?: (enabled: boolean) => Promise<void>;
   onZCodeInteractionBehaviorChange: (behavior: ZCodeInteractionBehavior) => Promise<void>;
   onAskUserQuestionAutoResolutionEnabledChange?: (enabled: boolean) => Promise<void>;
   onModelIoFullRetentionEnabledChange?: (enabled: boolean) => Promise<void>;
@@ -1102,6 +1106,22 @@ export function AgentBehaviorSectionContent({
               checked={messageStreamShowTodos}
               onCheckedChange={(checked) => {
                 void onMessageStreamShowTodosChange(checked);
+              }}
+            />
+          }
+        />
+        <SettingsRow
+          searchId="settings.composerInputPrediction"
+          label={intl.formatMessage({ id: "settings.composerInputPrediction" })}
+          description={intl.formatMessage({
+            id: "settings.composerInputPredictionDescription",
+          })}
+          control={
+            <Switch
+              aria-label={intl.formatMessage({ id: "settings.composerInputPrediction" })}
+              checked={composerInputPredictionEnabled}
+              onCheckedChange={(checked) => {
+                void onComposerInputPredictionEnabledChange(checked);
               }}
             />
           }

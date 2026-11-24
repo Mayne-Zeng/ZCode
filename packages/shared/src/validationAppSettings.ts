@@ -569,6 +569,9 @@ const appSettingsObjectSchema = z.object({
   messageStreamShowReasoning: z.boolean().default(true),
   messageStreamShowReasoningMigrationInitialized: z.boolean().default(true),
   messageStreamShowTodos: z.boolean().default(false),
+  // 桌面端回合结束后在输入框显示下一步预测（spec：docs/composer-input-prediction.md）。
+  // 必须声明在完整 schema，否则合并后显式 false 会被剥离。
+  composerInputPredictionEnabled: z.boolean().default(true),
   zcodeInteractionBehavior: zcodeInteractionBehaviorSchema.default("queue"),
   askUserQuestionAutoResolutionEnabled: z.boolean().default(true),
   pluginAutoRecommendationEnabled: z.boolean().default(false),
@@ -673,6 +676,7 @@ export const appSettingsPatchSchema = z.object({
   messageStreamShowReasoning: z.boolean().optional(),
   messageStreamShowReasoningMigrationInitialized: z.boolean().optional(),
   messageStreamShowTodos: z.boolean().optional(),
+  composerInputPredictionEnabled: z.boolean().optional(),
   zcodeInteractionBehavior: zcodeInteractionBehaviorSchema.optional(),
   askUserQuestionAutoResolutionEnabled: z.boolean().optional(),
   pluginAutoRecommendationEnabled: z.boolean().optional(),

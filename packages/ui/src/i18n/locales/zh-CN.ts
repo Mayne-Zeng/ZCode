@@ -3804,6 +3804,9 @@ const zhCN: Record<string, string> = {
     "在消息流中展示完整的模型思考内容；关闭时每轮仍展示第一次思考。",
   "settings.messageStreamShowTodos": "显示待办",
   "settings.messageStreamShowTodosDescription": "在消息流中展示 Todo 工具卡片。",
+  "settings.composerInputPrediction": "输入区预测",
+  "settings.composerInputPredictionDescription":
+    "回合结束后在输入框显示预测的下一步提示，Tab 或点击采纳。每次预测会额外调用一次模型。",
   "settings.zcodeInteractionBehavior": "交互行为",
   "settings.zcodeInteractionBehaviorDescription":
     "在 ZCode 运行时将后续操作加入队列，或引导至下一轮工具调用后运行。",

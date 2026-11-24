@@ -2188,6 +2188,10 @@ exceptions:
       - packages/ui/src/v4/composer/draftModelMigration.ts
       - packages/ui/src/v4/composer/newTaskDraft.ts
     reason: 服务端规则驱动的草稿模型迁移（docs/chat/draft-model-migration.md）。新增文件只含纯判定与本设备 localStorage 标记；newTaskDraft 仅额外返回 Recent 来源。草稿 owner 仍是 useDraftConfigControl，不新增模块、IO 通道或状态 owner；接管整个 ui 目录不在本次紧急上线范围内。
+  - id: composer-input-prediction-hook
+    rule: unmanaged-new-file
+    paths: [packages/ui/src/v4/composer/useComposerInputPrediction.ts]
+    reason: 桌面端输入预测（docs/composer-input-prediction.md）的渲染层消费 hook；只读查询既有 conversationInputPredictionV4 通道，不新增模块、IO 通道或状态 owner（hint 为 composer 局部 state，采纳写回既有草稿）；接管整个 ui 目录不在本次范围。
   - id: highspeed-transcript-owner-existing-edit
     rule: unmanaged-new-file
     paths: [packages/ui/src/highspeed/highspeedTurnHydration.ts]
