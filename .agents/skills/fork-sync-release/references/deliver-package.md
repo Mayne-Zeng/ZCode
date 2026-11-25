@@ -2,6 +2,8 @@
 
 在仓库根目录执行。交付只做两件事：备份当前已安装的 app，把 DMG 放进 `~/Downloads`。不要碰 `/Applications` 里的 app 本身，安装由用户手动完成。
 
+把下面的整段存成脚本文件，用 `bash` 执行：`set -e` 的语义以 bash 为准，脚本的退出码就是整段的退出码。最后的 `ls` 输出 DMG 和备份两行，说明整段走到了最后一步。
+
 ## 为什么要备份
 
 访达的「替换」会直接删除旧版，不进废纸篓，所以替换前留一份 zip。官方版和自建版放到不同目录：`~/ZCode-official-backup/` 里的官方签名包是换回 Computer Use 的唯一途径，不要覆盖或删除。
@@ -60,6 +62,7 @@ ls -la "$DST" "$BACKUP_DIR/$BACKUP"
 ## 各步骤的依据
 
 - `8A5X4JJ39T` 是官方 Team ID，只有官方包能匹配上。
+- 已安装的是自建包时，备份进 `~/ZCode-fork-backup/`；这个目录不存在就新建（2026-11-25 第一次给自建版做备份时新建的）。下载目录里找不到上一次的 DMG 很正常，用户装完常会删掉，回滚靠的是这里的 zip。
 - 官方包签名无效就换不回 Computer Use，所以第 2 步要解压出来让 Gatekeeper 实际评估一次，应当看到 `accepted` 和 `source=Notarized Developer ID`。自建包是 ad-hoc 签名，Gatekeeper 本来就不接受，这一步对它没有意义。
 - 文件名里的短 sha 取 8 位，与包内 `build-meta.json` 的 `buildCommitId` 一致，用户在应用里看到的构建号和文件名对得上。
 - 同一个提交重新打包会撞名，这时问用户是覆盖还是加序号。

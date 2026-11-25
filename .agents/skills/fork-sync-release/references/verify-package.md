@@ -21,7 +21,10 @@ node node_modules/@electron/asar/bin/asar.js list "$APP/Contents/Resources/app.a
 
 grep -E "^out/" /tmp/zcode-asar.txt | cut -d/ -f1-2 | sort -u | tr '\n' ' '; echo
 grep -nE "^out/.*\.map$|^out/.*tsbuildinfo$|^out/(app-control-navigation|e2e)(/|$)" /tmp/zcode-asar.txt
+# fork 改动的包内标识，逐项都应大于 0；清单见 fork-features.md
 grep -a -c composerInputPredictionEnabled "$APP/Contents/Resources/app.asar"
+grep -a -c "chat-output-rate-stat" "$APP/Contents/Resources/app.asar"
+grep -c "latestTokensPerSecond" "$APP/Contents/Resources/glm/zcode.cjs"
 /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" -c "Print :CFBundleIdentifier" "$APP/Contents/Info.plist"
 codesign -dv "$APP" 2>&1 | grep -E "^Signature"
 rm -f /tmp/zcode-asar.txt
@@ -36,7 +39,7 @@ rm -f /tmp/zcode-asar.txt
   ```
 
 - 第二条没有输出。有输出说明 typecheck 残留或构建缓存被打进了包，回到阶段 3 清理后重打。
-- 第三条大于 0。
+- 三条 fork 标识都大于 0（2026-11-25 的构建分别是 16、1、3）。出现 0 说明包里的提交不含对应改动，回到阶段 2 核对 `main` 是否包含全部 fork 提交。
 - 版本号等于 `node -p "require('./package.json').version"`，bundle id 是 `dev.zcode.app`。
 - 签名是 `adhoc`。
 
