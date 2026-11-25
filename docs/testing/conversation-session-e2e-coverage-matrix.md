@@ -4931,14 +4931,22 @@ Memory MEM08 埋点补充（2026-09-17）：现有 Desktop Memory 用例同时�
 
 CLI 全量 lint 被既有 max-lines 错误阻塞；`zcode-protocol.test.ts` 的远程 Cron denylist 与 Account Config 两项断言失败，使用未修改的 server/server-operations 源码复跑同样失败。
 
-## COR：上下文容量卡片的输出速率
+## COR：工具栏输出速率与缓存命中率
 
 | Case  | 状态    | 自动化入口                                                                                                                                                                                   | 覆盖范围                                                                     |
 | ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| COR01 | pending | `packages/desktop/test/e2e/conversation-session/context/manual-review/pending/conversation-session-context-output-rate.test.ts`                                                              | desktop continuous 真实 provider replay → 悬停上下文圆环 → 卡片显示平均输出速率 35–45 tok/s |
-| COR02 | focused | `apps/zcode-cli/packages/bootstrap/tests/product-projection.test.ts`、`apps/zcode-cli/packages/core/tests/turn-model-step-output-rate.test.ts`                                               | token 加权平均、旁路与缺失计时不参与、旧事件与冷恢复合成事件不产出字段       |
+| COR01 | pending | `packages/desktop/test/e2e/conversation-session/context/manual-review/pending/conversation-session-context-output-rate.test.ts`                                                              | desktop continuous 真实 provider replay → 工具栏按「速率 35–45 tok/s → 缓存率 95% → 圆环 0%」排列、完成前不出现 |
+| COR02 | pending | `packages/desktop/test/e2e/conversation-session/context/manual-review/pending/conversation-session-context-output-rate.test.ts`                                                              | 变窄去单位 → 整体隐藏 → 放宽恢复；1200 / 800 × 深浅 × 中英文截图             |
+| COR03 | focused | `apps/zcode-cli/packages/bootstrap/tests/product-projection.test.ts`、`apps/zcode-cli/packages/core/tests/turn-model-step-output-rate.test.ts`                                               | token 加权平均、旁路与缺失计时不参与、旧事件与冷恢复合成事件不产出字段       |
 
-2026-11-25 本地验证（macOS）：CLI focused tests 通过，`turn-model-step-output-rate.test.ts` 6/6、`product-projection.test.ts` 247/247（core 全量 350 文件 5825 条通过；bootstrap 全量 3876 条通过）。Electron 上 COR01 首轮被基线问题挡在公共准备步骤：`prepareV4ConversationE2E()` 等 `chat-model-select-trigger` 30s 不可点击，遮挡物是后端按 `X-ZCode-App-Version` 定向下发的云端内容弹窗（同一接口带 4.0.0 返回 1 条 popup，带 3.18.2 / 3.18.1 返回 0 条），既有正式用例 DBG01 同症状（run `desktop-e2e-20261124-163853-109`，exit 1）。随后在共享 helper `skipOccupationOnboardingIfPresent` 补上弹窗关闭（页面内哨兵，见开发工作流「共享初始化合同」），**spec 未改**的情况下 COR01 通过 1/1（run `desktop-e2e-20261125-020029-866`，exit 0），卡片显示 `39.9 tok/s`；DBG01 同样恢复通过（run `desktop-e2e-20261125-015846-145`，exit 0）；营销专项回归 `marketing-touch-task-completion`（`keepCloudDialog` 路径）1/1、`marketing-touch-anonymous` 2/2 通过。COR01 仍为 pending，待人工 review 后转正。bootstrap 全量另有 2 条与本组无关的既有失败：`dynamic-mcp-config.test.ts`（HEAD 同样失败）、`session-control/standalone-tui-approval.e2e.test.ts`（本检出未构建 `@zcode/tui`）。
+2026-11-25 本地验证（macOS）。首版把平均输出速率放在悬浮卡片里（run `desktop-e2e-20261125-020029-866`，1/1）；随后按用户反馈移到工具栏并改取最近一次请求，CLI 与线格式未变，CLI focused tests 结果同首版：`turn-model-step-output-rate.test.ts` 6/6、`product-projection.test.ts` 247/247。移到工具栏后、并在圆环右侧加上占用百分比后的结果：
+
+- COR01 / COR02：通过 1/1（run `desktop-e2e-20261125-072801-866`，exit 0；加百分比之前的一次是 `desktop-e2e-20261125-035844-871`）。完成请求前两项都不出现；完成后按「速率 → 缓存率 → 圆环 + 占用百分比」排列，占用百分比取整为 0%（用量 240 / 13 万），回放为 120 token / 约 3 秒，速率取整为 40 tok/s（断言 35–45）、缓存命中率 95%；窗口收窄到 880 去掉速率单位、到 720 两项与占用百分比整体隐藏（只留圆环），放宽后恢复；1200 / 800 × 深浅 × 中英文共 8 张截图在产物的 `conversation-session-context-output-rate/`。两项仍为 pending，待人工 review 后转正。
+- 回归通过：DBG01（加百分比后重跑 `desktop-e2e-20261125-072935-588`）；CMP01 Composer 五档压缩（加百分比后重跑 `desktop-e2e-20261125-073046-085`）；`plugin-extension-host-runtime` 3/3，其中「扩展条目在窄工具栏里最先收起」的断言成立。
+- `plugin-extension-host-runtime` 原样在本机无法运行：它要求窗口内容区高 900，本机上限 887。验证时临时把高度改成 800，跑完已还原。分支上最早一次运行失败于 `scope=workspace`，是该用例在草稿预热会话就绪前点击扩展条目的竞态（分支 4 次里出现 1 次，干净 `main` 的独立 worktree 上 3 次未出现）。
+- 未验证：手机远控页面的窄屏布局（桌面窗口最小 480，用 renderer viewport 模拟 390 只会裁出桌面布局左侧）；扩展插槽与状态项同时存在时的收起先后（只有收缩顺序数组上的保证）；两项悬浮说明的实际显示。
+- 首版曾被后端按 `X-ZCode-App-Version` 定向下发的云端内容弹窗挡在公共准备步骤（DBG01 同症状），已在 `skipOccupationOnboardingIfPresent` 修复，见开发工作流「共享初始化合同」。
+- bootstrap 全量另有 2 条与本组无关的既有失败：`dynamic-mcp-config.test.ts`（HEAD 同样失败）、`session-control/standalone-tui-approval.e2e.test.ts`（本检出未构建 `@zcode/tui`）。
 
 ### RDUX-04 向导回归
 

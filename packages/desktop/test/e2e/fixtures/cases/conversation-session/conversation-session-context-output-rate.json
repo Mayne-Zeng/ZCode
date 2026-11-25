@@ -20,7 +20,7 @@
       "kind": "main",
       "source": "synthetic",
       "timingPolicy": "controlled-stream",
-      "syntheticReason": "固定首输出前等待与输出阶段，验证卡片平均输出速率排除 TTFT。"
+      "syntheticReason": "固定首输出前等待与输出阶段，验证 TPS 排除 TTFT；用量按未缓存 6 + 缓存读取 114 构造，覆盖缓存命中率状态项。"
     }
   ]
 }

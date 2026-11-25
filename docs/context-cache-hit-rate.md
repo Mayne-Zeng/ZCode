@@ -2,7 +2,8 @@
 
 ZCode context usage now carries provider cache hit information on the same path as the input toolbar context meter.
 
-The toolbar cache hit rate is a main-session aggregate, not the last provider request.
+The toolbar cache hit rate is the latest main-turn request's rate (`latestHitRate`); the main-session
+aggregate is still carried in `hitRate`.
 
 ## Data Flow
 
@@ -20,7 +21,7 @@ Anthropic path, so the denominator must not add cache fields again.
 - `hitRateRequestCount`, `totalInputTokens`, `totalCacheReadTokens`, and `totalCacheWriteTokens` describe the aggregate window used to compute `hitRate`.
 - ZCode Protocol snapshot returns the value at `runtime.contextUsage.cache`.
 - Task stream emits the same value on `usage_update.cache`, so desktop `continuous` and mobile `/remote` `replayable` clients consume one shared payload.
-- UI displays `cache.hitRate` in the chat input context panel when the field is present. Production builds keep the aggregate `0.78` (78%) threshold so lower rates do not distract from context capacity; development builds always display every valid rate to make provider cache diagnostics observable. It does not invent a fallback when the provider omits cache usage, and it does not infer cache hit rate from task cumulative token usage.
+- UI displays `cache.latestHitRate` as a stat in the composer toolbar, left of the context ring, when the field is present. Production builds keep the `0.78` (78%) threshold so lower rates do not distract from context capacity; development builds always display every valid rate to make provider cache diagnostics observable. It does not invent a fallback when the provider omits cache usage, and it does not infer cache hit rate from task cumulative token usage.
 
 ## Context Source Breakdown
 
@@ -117,5 +118,5 @@ times are not fallbacks. Workspace/task switching, desktop/mobile widths and lig
 preserve isolation and readability. Read-only protocol tests and browser integration evidence remain separate from
 formal desktop E2E admission.
 
-The context card's average output rate aggregates the same per-request value over main-turn
-requests; see [context-output-rate.md](./context-output-rate.md).
+The toolbar's output rate stat sits next to the cache hit rate stat and uses the same per-request
+value; see [context-output-rate.md](./context-output-rate.md).

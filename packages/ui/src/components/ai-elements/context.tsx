@@ -114,18 +114,29 @@ const ContextIcon = () => {
 export type ContextTriggerProps = ComponentProps<typeof Button> & {
   /** 触发器转圈：额度自动重置进行中时替换 ContextIcon（对应「正在重置」状态）。 */
   loading?: boolean;
+  /**
+   * 圆环右侧的紧凑标签（如上下文占用百分比）。提供时触发器从方形图标按钮变成
+   * 「圆环 + 文字」的胶囊，两者同属一个悬停触发器。
+   */
+  label?: ReactNode;
 };
 
-export const ContextTrigger = ({ children, loading = false, ...props }: ContextTriggerProps) => {
+export const ContextTrigger = ({
+  children,
+  label,
+  loading = false,
+  ...props
+}: ContextTriggerProps) => {
+  const labeled = label !== undefined && label !== null;
   return (
     <HoverCardTrigger asChild>
       {children ?? (
         <Button
           type="button"
           variant="ghost"
-          size="icon-md"
+          size={labeled ? "default" : "icon-md"}
           {...props}
-          className={cn(props.className)}
+          className={cn(labeled && "w-fit shrink-0 rounded-lg px-1.5 text-ui-sm", props.className)}
         >
           {loading ? (
             <LoaderCircle
@@ -135,6 +146,7 @@ export const ContextTrigger = ({ children, loading = false, ...props }: ContextT
           ) : (
             <ContextIcon />
           )}
+          {labeled ? label : null}
         </Button>
       )}
     </HoverCardTrigger>

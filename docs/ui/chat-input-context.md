@@ -10,16 +10,20 @@
 ## 当前实现
 
 - `packages/ui/src/v4/composer/V4ComposerToolbar.tsx`
-  - 把 snapshot 的 `usage.contextWindow.usedTokens` / `maxTokens` / cache / breakdown / outputRate 转成输入栏展示模型
+  - 把 snapshot 的 `usage.contextWindow.usedTokens` / `maxTokens` / cache / breakdown 转成 context 面板展示模型
   - 复用 `packages/ui/src/chat-input-toolbar/contextUsage.tsx` 的 `ChatContextUsage`
   - 复用已加载的 Z.ai / BigModel Coding Plan entitlement，不在 context 菜单里重复发起 quota 请求
   - Coding Plan `Usage Remaining` 复用 paid Coding Plan 的 entitlement/state 解析工具，但展示入口只保留在输入框 context 和 Usage 页
   - footer badge 与输入框 context 的 Coding Plan entitlement 使用同一套 provider/apiKey 指纹缓存，并对齐 paid plan 查询参数，避免同源额度拆成两份缓存
   - 使用 `ContextTrigger` 作为上下文入口
-  - 使用 `ContextContentBody` 展示上下文窗口占用、breakdown、cache hit rate、平均输出速率，以及 Coding Plan `Usage Remaining`
-  - cache hit rate 只有在主轮累计命中率大于等于 78% 时展示；低于 78% 的值不在紧凑 context 面板中显示
-  - 展示主轮请求的「平均输出速率」，位于 cache hit rate 行之后，样式与该行一致（subtle label、mono 数值）；值为本地化的一位小数加 `tok/s`，悬停说明标注参与统计的请求数
-  - 平均输出速率只在 snapshot 带 `usage.contextWindow.outputRate` 时渲染，字段缺席（冷恢复后尚未完成请求、旧 CLI）时整行不出现；不设展示阈值，流式期间保持上一次请求结束后的值，不做估算。口径、归属与恢复边界见 [context-output-rate.md](../context-output-rate.md)
+  - 使用 `ContextContentBody` 展示上下文窗口占用、breakdown，以及 Coding Plan `Usage Remaining`
+- 工具栏在圆环左边显示两个内置状态项，顺序为「输出速率 → 缓存命中率 → 圆环」，扩展插槽 `composer.status` 在它们左边。由 `packages/ui/src/chat-input-toolbar/ComposerUsageStats.tsx` 渲染，样式沿用扩展插槽规格（`h-7`、`size-3.5` 图标、`text-ui-sm text-foreground-subtle tabular-nums`）；非交互，悬停说明用 `ControlHintTooltip`
+  - 输出速率显示最近一次主轮请求的值（`usage.contextWindow.outputRate.latestTokensPerSecond`），取整加 `tok/s`；悬停说明带本次加载以来的平均速率与请求数。流式期间保持上一次请求结束后的值，不做估算
+  - 缓存命中率显示最近一次主轮请求的值（`usage.contextWindow.cache.latestHitRate`），取整百分比；沿用 78% 展示阈值，低于阈值时该项不出现
+  - 字段缺席（冷恢复后尚未完成请求、旧 CLI）时对应状态项不渲染
+  - 工具栏空间不足时按 `composer-toolbar-layout/CONTRACT.md` 收缩：`stat` 档去掉速率单位；各档文字都收起后仍放不下时两项整体隐藏
+- context 面板不再显示缓存命中率与输出速率，两项都已移到工具栏
+- 圆环右侧紧跟当前上下文占用百分比（取整，如 `70%`），两者同属一个悬停 / 触摸触发器，胶囊样式与状态项一致；只在 `used` / `size` 都有正值时显示，仅有套餐额度而没有用量数据时不显示，避免把未知用量显示成 0%。工具栏进入「附加信息整体隐藏」阶段时百分比一并隐藏，只留圆环
   - 输入框 context 内的 Coding Plan 用量独立渲染，不复用 sidebar 菜单面板 UI
 - `packages/ui/src/components/ai-elements/context.tsx`
   - 增加了 0 上限保护，避免进度百分比出现无效值

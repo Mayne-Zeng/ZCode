@@ -1895,6 +1895,9 @@ const koKR: Record<string, string> = {
   "chat.toolbar.model.loadFailedRetry": "모델을 불러오지 못했습니다. 다시 시도",
   "chat.toolbar.model.remoteWaiting": "원격 모델 대기 중",
   "chat.toolbar.model.targetMissing": "모델 대상 없음",
+  "chat.toolbar.outputRate.tooltip":
+    "최근 요청 {latest} tok/s · 로드 이후 평균 {average} tok/s (메인 턴 {count}회)",
+  "chat.toolbar.cacheHitRate.tooltip": "최근 요청의 캐시 적중률",
   "settings.subagents.modelLoadFailed": "모델 목록을 불러오지 못했습니다.",
   "root.modelSelection.loadFailed": "모델 구성을 불러오지 못했습니다.",
   "modelTrajectory.openSourceDirectory": "소스 폴더 열기",
@@ -6162,10 +6165,6 @@ const koKR: Record<string, string> = {
   "chat.contextUsage.title": "컨텍스트 창",
   "chat.contextUsageDescription":
     "프롬프트 텍스트, 도구 호출, 응답이 모두 이 컨텍스트 창을 공유합니다.",
-  "chat.contextUsage.cacheHitRate": "평균 캐시 적중률",
-  "chat.contextUsage.outputRate": "평균 출력 속도",
-  "chat.contextUsage.outputRate.value": "{value} tok/s",
-  "chat.contextUsage.outputRate.requestCount": "메인 턴 요청 {count}회 기준",
   "chat.contextUsage.breakdown": "컨텍스트 출처",
   "chat.contextUsage.breakdown.messages": "메시지",
   "chat.contextUsage.breakdown.systemPrompt": "시스템 프롬프트",

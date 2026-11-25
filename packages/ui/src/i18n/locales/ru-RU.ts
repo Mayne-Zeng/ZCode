@@ -1930,6 +1930,9 @@ const ruRU: Record<string, string> = {
   "chat.toolbar.model.loadFailedRetry": "Не удалось загрузить модели. Повторить",
   "chat.toolbar.model.remoteWaiting": "Ожидание удалённых моделей",
   "chat.toolbar.model.targetMissing": "Нет целевой модели",
+  "chat.toolbar.outputRate.tooltip":
+    "Последний запрос: {latest} tok/s · средняя {average} tok/s, запросов основного хода с момента загрузки: {count}",
+  "chat.toolbar.cacheHitRate.tooltip": "Доля попаданий в кэш последнего запроса",
   "settings.subagents.modelLoadFailed": "Не удалось загрузить список моделей.",
   "root.modelSelection.loadFailed": "Не удалось загрузить конфигурацию моделей.",
   "modelTrajectory.openSourceDirectory": "Открыть исходную папку",
@@ -6291,10 +6294,6 @@ const ruRU: Record<string, string> = {
   "chat.contextUsage.title": "Контекстные окна",
   "chat.contextUsageDescription":
     "Текст промпта, вызовы инструментов и ответы используют одно контекстное окно.",
-  "chat.contextUsage.cacheHitRate": "Средняя доля попаданий в кэш",
-  "chat.contextUsage.outputRate": "Средняя скорость вывода",
-  "chat.contextUsage.outputRate.value": "{value} tok/s",
-  "chat.contextUsage.outputRate.requestCount": "Запросов основного хода: {count}",
   "chat.contextUsage.breakdown": "Источники контекста",
   "chat.contextUsage.breakdown.messages": "Сообщения",
   "chat.contextUsage.breakdown.systemPrompt": "Системный промпт",

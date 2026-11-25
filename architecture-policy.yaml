@@ -2192,6 +2192,10 @@ exceptions:
     rule: unmanaged-new-file
     paths: [packages/ui/src/v4/composer/useComposerInputPrediction.ts]
     reason: 桌面端输入预测（docs/composer-input-prediction.md）的渲染层消费 hook；只读查询既有 conversationInputPredictionV4 通道，不新增模块、IO 通道或状态 owner（hint 为 composer 局部 state，采纳写回既有草稿）；接管整个 ui 目录不在本次范围。
+  - id: composer-usage-stats
+    rule: unmanaged-new-file
+    paths: [packages/ui/src/chat-input-toolbar/ComposerUsageStats.tsx]
+    reason: 工具栏内置用量状态项（docs/ui/chat-input-context.md、docs/context-output-rate.md）；只读渲染 V4 snapshot usage.contextWindow 里已有的 outputRate 与 cache.latestHitRate，不新增模块、IO 通道或状态 owner，收缩沿用 composer-toolbar-layout 的既有档位。接管整个 ui 目录不在本次范围。
   - id: highspeed-transcript-owner-existing-edit
     rule: unmanaged-new-file
     paths: [packages/ui/src/highspeed/highspeedTurnHydration.ts]

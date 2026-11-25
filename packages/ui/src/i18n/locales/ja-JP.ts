@@ -1953,6 +1953,9 @@ const jaJP: Record<string, string> = {
   "chat.toolbar.model.loadFailedRetry": "モデルを読み込めませんでした。再試行",
   "chat.toolbar.model.remoteWaiting": "リモートのモデルを待っています",
   "chat.toolbar.model.targetMissing": "モデルの対象がありません",
+  "chat.toolbar.outputRate.tooltip":
+    "最新のリクエスト {latest} tok/s · 読み込み以降の平均 {average} tok/s（メイントーン {count} 件）",
+  "chat.toolbar.cacheHitRate.tooltip": "最新リクエストのキャッシュヒット率",
   "settings.subagents.modelLoadFailed": "モデル一覧を読み込めませんでした。",
   "root.modelSelection.loadFailed": "モデル構成を読み込めませんでした。",
   "modelTrajectory.openSourceDirectory": "ソースフォルダを開く",
@@ -6313,10 +6316,6 @@ const jaJP: Record<string, string> = {
   "chat.contextUsage.title": "コンテキストウィンドウ",
   "chat.contextUsageDescription":
     "プロンプトのテキスト、ツール呼び出し、応答はすべてこのコンテキストウィンドウを共有します。",
-  "chat.contextUsage.cacheHitRate": "平均キャッシュヒット率",
-  "chat.contextUsage.outputRate": "平均出力速度",
-  "chat.contextUsage.outputRate.value": "{value} tok/s",
-  "chat.contextUsage.outputRate.requestCount": "メイントーンのリクエスト {count} 件に基づく",
   "chat.contextUsage.breakdown": "コンテキストのソース",
   "chat.contextUsage.breakdown.messages": "メッセージ",
   "chat.contextUsage.breakdown.systemPrompt": "システムプロンプト",

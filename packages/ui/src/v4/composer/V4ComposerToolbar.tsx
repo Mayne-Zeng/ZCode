@@ -48,6 +48,7 @@ import { Button } from "@/components/ui/button.js";
 import { HighspeedModelIndicator } from "@/highspeed/HighspeedModelIndicator.js";
 import { formatHighspeedRemainingTime } from "@/highspeed/highspeedTime.js";
 import { ChatContextUsage } from "@/chat-input-toolbar/display.js";
+import { ComposerUsageStats } from "@/chat-input-toolbar/ComposerUsageStats.js";
 import {
   hasChatCodingPlanUsageRemaining,
   type ChatCodingPlanUsageRemainingConfig,
@@ -1164,9 +1165,7 @@ function V4ComposerModelControlsImpl({
     return {
       used: contextWindow.usedTokens,
       size: contextWindow.maxTokens,
-      ...(contextWindow.cache ? { cache: contextWindow.cache } : {}),
       ...(contextWindow.breakdown ? { breakdown: contextWindow.breakdown } : {}),
-      ...(contextWindow.outputRate ? { outputRate: contextWindow.outputRate } : {}),
     };
   }, [usage?.contextWindow]);
   // 工具条热键已转正为命令表命令：tooltip 快捷键文案读生效表，
@@ -1302,16 +1301,23 @@ function V4ComposerModelControlsImpl({
       />
       {/* Highspeed 卡激活即锁定模型；不能等动效交接完成才隐藏，否则 usage 圈圈会短暂闪现。 */}
       {!modelLocked ? (
-        <ChatContextUsage
-          codingPlanUsageRemaining={codingPlanUsageRemaining}
-          taskUsage={taskUsage}
-          startPlanBalance={contextStartPlanBalance}
-          selectedProvider={displayProvider}
-          intl={intl}
-          locale={locale}
-          onSendCompressionCommand={onSendCompressionCommand}
-          compressionDisabled={disabled || recoveryPending}
-        />
+        <>
+          {/* 工具栏内置用量状态项，紧挨圆环左边：输出速率 → 缓存命中率 → 圆环。 */}
+          <ComposerUsageStats
+            cacheHitRate={usage?.contextWindow?.cache?.latestHitRate}
+            outputRate={usage?.contextWindow?.outputRate}
+          />
+          <ChatContextUsage
+            codingPlanUsageRemaining={codingPlanUsageRemaining}
+            taskUsage={taskUsage}
+            startPlanBalance={contextStartPlanBalance}
+            selectedProvider={displayProvider}
+            intl={intl}
+            locale={locale}
+            onSendCompressionCommand={onSendCompressionCommand}
+            compressionDisabled={disabled || recoveryPending}
+          />
+        </>
       ) : null}
       {/* 加速轮的模型由本次卡决定，选型菜单此时不可用，所以指示器优先于选型加载态。 */}
       {highspeedPresented && highspeedModel ? (

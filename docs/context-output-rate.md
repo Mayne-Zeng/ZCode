@@ -1,19 +1,20 @@
-# 上下文容量卡片的输出速率（tok/s）
+# 工具栏输出速率（tok/s）
 
-聊天输入栏的上下文容量卡片新增一行「平均输出速率」，显示主会话模型请求的输出 token 速率。
+聊天输入框工具栏在上下文圆环左边显示主会话模型请求的输出 token 速率，与缓存命中率并排。
 数据与缓存命中率走同一条通道：CLI core 运行时聚合，随 `ModelComplete` 发出，由 V4 snapshot 的
 `usage.contextWindow` 承载。本文定义口径、归属与恢复边界；展示规则见
 [chat-input-context.md](./ui/chat-input-context.md)，单次请求的速率公式以
 [context-cache-hit-rate.md](./context-cache-hit-rate.md)「Output TPS」为唯一定义。
 
-## 决策记录（2026-11-25，用户确认）
+## 决策记录（2026-11-25）
 
-| 决策     | 结论                                                                              |
-| -------- | --------------------------------------------------------------------------------- |
-| 展示位置 | 上下文容量卡片内，缓存命中率行之后；不在工具栏常驻（后续可复用同一字段）          |
-| 展示值   | 主轮请求的 token 加权平均；载荷同时带最近一次的值，切换展示只需改 UI              |
-| 流式阶段 | 不做估算，只显示请求结束后的准确值（沿用 2026-11-06 对 `composer.status` 的决定） |
-| 归属     | core `AgentRuntime` 聚合；投影与 UI 只透传，不各自推导                            |
+| 决策       | 结论                                                                                | 来源                         |
+| ---------- | ----------------------------------------------------------------------------------- | ---------------------------- |
+| 展示位置   | 工具栏圆环左边，顺序「输出速率 → 缓存命中率 → 圆环」；不在悬浮卡片里显示            | 用户确认                     |
+| 展示值     | 最近一次主轮请求的速率（`latestTokensPerSecond`），取整                             | 用户确认（要更接近当前速度） |
+| 平均与计数 | 不直接展示，只出现在速率的悬停说明里                                                | 实现者默认                   |
+| 流式阶段   | 保持上一次请求结束后的值，不做估算（与 2026-11-06 对 `composer.status` 的决定一致） | 实现者默认，用户未表态       |
+| 归属       | core `AgentRuntime` 聚合；投影与 UI 只透传，不各自推导                              | 用户确认                     |
 
 ## 口径
 
@@ -46,7 +47,7 @@ outputRate: {
 }
 ```
 
-`averageTokensPerSecond` 必须能由三个计数器复算，UI 不得用 `latestTokensPerSecond` 冒充平均。
+`averageTokensPerSecond` 必须能由三个计数器复算；工具栏的数值只读 `latestTokensPerSecond`。
 
 ## 归属与事件顺序
 
@@ -80,14 +81,14 @@ runtime 发出 ModelComplete {cacheHit, outputRate ← 聚合快照, usage, cont
 - `ModelComplete.outputRate` 可选：只在主轮且运行实例已有有效样本时出现。
 - V4 `usage.contextWindow.outputRate` 与 `cache` 平级。`contextWindow` 不是 strict 对象，旧 App
   解析时丢弃未知键，新 App 接受旧 CLI 的缺省。
-- legacy `runtime.contextUsage` 与 `usage_update` 是 strict schema，且已不再供卡片读取，不扩展。
+- legacy `runtime.contextUsage` 与 `usage_update` 是 strict schema，且已不再供工具栏读取，不扩展。
 
 ## 恢复边界
 
 - 速率不落盘。transcript 冷恢复合成的 `ModelComplete` 不带 `outputRate`：transcript 不持久化网络
-  计时，不得伪造。冷恢复后卡片不显示该行，直到当前运行实例第一次主轮请求完成。
-- 运行实例重建（resume、rewind）后聚合从空开始，不从消息或历史事件重算。平均值的范围是
-  「当前运行实例内已完成的主轮请求」，卡片行用悬停说明标注参与统计的请求数。
+  计时，不得伪造。冷恢复后工具栏不显示速率，直到当前运行实例第一次主轮请求完成。
+- 运行实例重建（resume、rewind）后聚合从空开始，不从消息或历史事件重算。悬停说明里的平均值的范围是
+  「当前运行实例内已完成的主轮请求」。
 - 同一进程内按事件重放重建的投影得到相同的 `outputRate`。
 - compact 成功会整体重建 `usage.contextWindow`，此时 `outputRate` 与 `cache` 一样暂不携带，下一次
   主轮 `ModelComplete` 恢复；运行实例的聚合不因 compact 清零。
@@ -98,4 +99,4 @@ runtime 发出 ModelComplete {cacheHit, outputRate ← 聚合快照, usage, cont
 - 两次请求分别为 120 tok / 3 秒和 300 tok / 1 秒，平均是 105 tok/s（token 加权），不是 170。
 - 缺少 `timeToFirstContentMs` 的请求不参与统计，不得退回 `durationMs`。
 - 旁路请求与旧事件（无 `outputRate`）不产出该字段；冷恢复后的 `usage.contextWindow` 没有该键。
-- 卡片在字段存在时显示「平均输出速率」，不存在时整行不渲染。
+- 工具栏在字段存在时显示速率，不存在时不渲染；`stat` 档收起单位，隐藏阶段整体不显示。

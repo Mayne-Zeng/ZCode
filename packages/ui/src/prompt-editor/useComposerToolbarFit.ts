@@ -1,5 +1,12 @@
 import { useLayoutEffect, useRef } from "react";
 
+// fitComposerToolbar 写在根节点上的布局状态；测量副本与真实根节点之间按这份清单同步。
+const TOOLBAR_ROOT_STATE_KEYS = [
+  "composerStatsHidden",
+  "composerModelIcon",
+  "composerProviderCompact",
+] as const;
+
 function toolbarOverflow(root: HTMLElement): number {
   const available = root.querySelector<HTMLElement>("[data-composer-leading-actions]");
   const content = root.querySelector<HTMLElement>("[data-composer-leading-content]");
@@ -29,12 +36,12 @@ export function fitComposerToolbar(root: HTMLElement, { iconOnly = false } = {})
   if (!available || !content) return;
   const controls = root.querySelectorAll<HTMLElement>("[data-composer-collapse-priority]");
   // 每次从完整布局测量，避免各按钮独立 observer 互相抢空间，也覆盖语言与异步入口变化。
-  delete root.dataset.composerModelIcon;
-  delete root.dataset.composerProviderCompact;
+  for (const key of TOOLBAR_ROOT_STATE_KEYS) delete root.dataset[key];
   for (const control of controls) delete control.dataset.composerCompact;
   const overflow = iconOnly ? () => Number.POSITIVE_INFINITY : () => toolbarOverflow(root);
-  // 扩展插槽（composer.status）最先收起；之后四档依次收起 Computer、mode、Plan、think 文字，不能合并裁决。
-  for (const priority of ["extension", "0", "1", "2", "3"]) {
+  // 扩展插槽（composer.status）最先收起；随后内置用量状态项去掉速率单位；
+  // 之后四档依次收起 Computer、mode、Plan、think 文字，不能合并裁决。
+  for (const priority of ["extension", "stat", "0", "1", "2", "3"]) {
     if (overflow() <= 0) return;
     for (const control of controls) {
       if (control.dataset.composerCollapsePriority === priority) {
@@ -43,6 +50,11 @@ export function fitComposerToolbar(root: HTMLElement, { iconOnly = false } = {})
     }
   }
   if (overflow() <= 0) return;
+  // 内置用量状态项只是附加信息：各档文字都收起后仍放不下时整体隐藏，把宽度留给模型名。
+  if (root.querySelector("[data-composer-stat]")) {
+    root.dataset.composerStatsHidden = "true";
+    if (overflow() <= 0) return;
+  }
   // 合并入口在最后一级仍保留绿条，不进入旧版独立 Think 的去绿条阶段。
   if (root.querySelector("[data-composer-combined-model]")) {
     root.dataset.composerModelIcon = "true";
@@ -73,8 +85,7 @@ export function useComposerToolbarFit({ iconOnly = false } = {}) {
       // 面板动画每次改宽都会通知 observer；完整布局已放得下时，克隆/插入副本只会徒增样式重算。
       // 已有压缩状态必须继续测量完整副本，才能在空间恢复、语言或模型变化时正确展开。
       if (
-        !root.dataset.composerModelIcon &&
-        !root.dataset.composerProviderCompact &&
+        !TOOLBAR_ROOT_STATE_KEYS.some((key) => root.dataset[key]) &&
         !root.querySelector("[data-composer-compact]") &&
         toolbarOverflow(root) <= 0
       )
@@ -94,7 +105,7 @@ export function useComposerToolbarFit({ iconOnly = false } = {}) {
       root.parentElement.append(probe);
       try {
         fitComposerToolbar(probe);
-        for (const key of ["composerModelIcon", "composerProviderCompact"]) {
+        for (const key of TOOLBAR_ROOT_STATE_KEYS) {
           if (probe.dataset[key]) root.dataset[key] = probe.dataset[key];
           else delete root.dataset[key];
         }

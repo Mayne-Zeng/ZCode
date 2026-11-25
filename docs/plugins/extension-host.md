@@ -254,7 +254,7 @@ Window Host ──静态表───► Renderer    插槽条目、命令、视�
 
 | 插槽                | 位置                                     | 条目                                   | 接受的 target | 作用域                 | 每插件上限 |
 | ------------------- | ---------------------------------------- | -------------------------------------- | ------------- | ---------------------- | ---------- |
-| `composer.status`   | 输入框工具栏，上下文用量圆环左边         | 图标 + 短文字 + 悬停说明，点击执行命令 | command       | 会话（草稿为预热会话） | 1          |
+| `composer.status`   | 输入框工具栏，内置用量状态项与上下文用量圆环左边 | 图标 + 短文字 + 悬停说明，点击执行命令 | command       | 会话（草稿为预热会话） | 1          |
 | `sidePane.launcher` | 右侧面板「新标签页」启动页的「扩展」分区 | 视图条目：点击打开扩展视图             | view          | 工作区                 | 5          |
 
 - 壳层组件渲染条目。扩展只提供标题、图标、排序和动态值（`text`、`tooltip`、`visible`）。
@@ -287,9 +287,9 @@ slots.update(...)
 
 事实（`packages/ui/src/...`）：
 
-- 用量圆环 `ChatContextUsage` 在 `V4ComposerModelControls` 里，位于模型选择器左边（`v4/composer/V4ComposerToolbar.tsx:1291-1346`）。`composer.status` 放在它前面。
-  - 实现：插槽渲染在 `ConversationComposer` 里、紧挨 `V4ComposerModelControls` 之前，视觉上就是圆环左边。会话作用域取有效会话 `pluginUiSessionId`（正式会话，或草稿的预热会话），与插件 UI 同一来源；模型控件组只拿到正式会话 id，草稿时为空。
-- 工具栏空间不足时按写死的档位 `["0","1","2","3"]` 依次收起（`prompt-editor/useComposerToolbarFit.ts:37`）。插件条目要**最先收起**，所以加一个排在 `"0"` 之前的档位。布局契约在 `composer-toolbar-layout/CONTRACT.md`，要同步更新。
+- 用量圆环 `ChatContextUsage` 在 `V4ComposerModelControls` 里，位于模型选择器左边（`v4/composer/V4ComposerToolbar.tsx:1291-1346`）。`composer.status` 放在它前面；两者之间是内置的输出速率与缓存命中率状态项（`chat-input-toolbar/ComposerUsageStats.tsx`，见 [chat-input-context.md](../ui/chat-input-context.md)）。
+  - 实现：插槽渲染在 `ConversationComposer` 里、紧挨 `V4ComposerModelControls` 之前，视觉上在内置状态项左边。会话作用域取有效会话 `pluginUiSessionId`（正式会话，或草稿的预热会话），与插件 UI 同一来源；模型控件组只拿到正式会话 id，草稿时为空。
+- 工具栏空间不足时按写死的档位 `["extension","stat","0","1","2","3"]` 依次收起（`prompt-editor/useComposerToolbarFit.ts`）。插件条目要**最先收起**，所以它的档位排在最前；内置状态项次之。布局契约在 `composer-toolbar-layout/CONTRACT.md`，要同步更新。
 - 启动页由 `openTabLauncher` 渲染（`app-shell/AnimatedSidePanePanel.tsx:824-891`），每行是 `SidePaneLauncherRow`。扩展分区复用同一个行组件。现有「UI 插件」分区只在有会话时显示，扩展分区不受这个限制。
 
 样式规则写进 `DESIGN.md` 的「Extension slots」小节（P1 新增）。
@@ -881,7 +881,7 @@ Renderer：selectSlotEntries(静态表, 快照, 扩展进程状态) → 插槽�
 
 | 插槽                | 位置                     | 接受的 target | 作用域 | 每插件上限 |
 | ------------------- | ------------------------ | ------------- | ------ | ---------- |
-| `composer.status`   | 输入框，用量圆环左边     | command       | 会话   | 1          |
+| `composer.status`   | 输入框，内置状态项与用量圆环左边 | command       | 会话   | 1          |
 | `sidePane.launcher` | 启动页「扩展」分区       | view          | 工作区 | 5          |
 | `nav.primary`       | 左侧导航「插件市场」下方 | view、surface | App    | 1          |
 | `file.viewer`       | 打开文件时               | view、surface | 工作区 | 5          |

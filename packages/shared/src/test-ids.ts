@@ -580,8 +580,12 @@ export const TID_CHAT_MODE_SELECT_TRIGGER = "chat-mode-select-trigger";
 export const TID_CHAT_MODE_SELECT_ITEM = "chat-mode-select-item";
 /** 聊天工具栏 context 消耗按钮 */
 export const TID_CHAT_CONTEXT_USAGE_TRIGGER = "chat-context-usage-trigger";
-/** context 面板「平均输出速率」行的数值 */
-export const TID_CHAT_CONTEXT_USAGE_OUTPUT_RATE = "chat-context-usage-output-rate";
+/** context 圆环右侧的上下文占用百分比 */
+export const TID_CHAT_CONTEXT_USAGE_PERCENT = "chat-context-usage-percent";
+/** 聊天工具栏输出速率状态项（缓存命中率与圆环的左边） */
+export const TID_CHAT_OUTPUT_RATE_STAT = "chat-output-rate-stat";
+/** 聊天工具栏缓存命中率状态项（输出速率与圆环之间） */
+export const TID_CHAT_CACHE_HIT_RATE_STAT = "chat-cache-hit-rate-stat";
 /** 思考块折叠触发按钮 */
 export const TID_CHAT_REASONING_TRIGGER = "chat-reasoning-trigger";
 /** 思考块折叠内容容器 */

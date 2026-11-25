@@ -2324,6 +2324,9 @@ const enUS: Record<string, string> = {
   "chat.toolbar.model.loadFailedRetry": "Models failed to load. Retry",
   "chat.toolbar.model.remoteWaiting": "Waiting for remote models",
   "chat.toolbar.model.targetMissing": "No model target",
+  "chat.toolbar.outputRate.tooltip":
+    "Latest request {latest} tok/s · average {average} tok/s over {count, plural, one {# main-turn request} other {# main-turn requests}} since load",
+  "chat.toolbar.cacheHitRate.tooltip": "Cache hit rate of the latest request",
   "settings.subagents.modelLoadFailed": "The model list failed to load.",
   "root.modelSelection.loadFailed": "Model configuration failed to load.",
   "modelTrajectory.openSourceDirectory": "Open source folder",
@@ -6647,11 +6650,6 @@ const enUS: Record<string, string> = {
   "chat.contextUsage.title": "Context windows",
   "chat.contextUsageDescription":
     "Prompt text, tool calls, and responses all share this context window.",
-  "chat.contextUsage.cacheHitRate": "Average cache hit rate",
-  "chat.contextUsage.outputRate": "Average output speed",
-  "chat.contextUsage.outputRate.value": "{value} tok/s",
-  "chat.contextUsage.outputRate.requestCount":
-    "{count, plural, one {Based on # main-turn request} other {Based on # main-turn requests}}",
   "chat.contextUsage.breakdown": "Context sources",
   "chat.contextUsage.breakdown.messages": "Messages",
   "chat.contextUsage.breakdown.systemPrompt": "System prompt",

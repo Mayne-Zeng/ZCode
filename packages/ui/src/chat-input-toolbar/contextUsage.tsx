@@ -13,9 +13,8 @@ import {
   type ZCodeContextUsageBreakdownItem,
   type ZCodeProvider,
 } from "@zcode/shared";
-import type { ZCodeContextOutputRate } from "@zcode/shared/zcode-protocol-v4";
 import {
-  TID_CHAT_CONTEXT_USAGE_OUTPUT_RATE,
+  TID_CHAT_CONTEXT_USAGE_PERCENT,
   TID_CHAT_CONTEXT_USAGE_TRIGGER,
 } from "@zcode/shared/test-ids";
 import {
@@ -118,16 +117,39 @@ export function formatContextUsageSummary({
   )} (${percentageFormatter.format(percent)})`;
 }
 
+/**
+ * 圆环右侧的上下文占用百分比（取整）。`used` / `size` 没有正值时返回 null：
+ * 只有套餐额度而没有用量数据时圆环仍会显示，这时不能把未知用量显示成 0%。
+ */
+export function formatContextUsagePercentLabel(
+  used: number,
+  size: number,
+  locale: string,
+): string | null {
+  if (!Number.isFinite(used) || !Number.isFinite(size) || used <= 0 || size <= 0) {
+    return null;
+  }
+
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+    style: "percent",
+  }).format(Math.min(Math.max(used / size, 0), 1));
+}
+
+/**
+ * 缓存命中率的展示文案，供工具栏状态项使用（docs/ui/chat-input-context.md）；
+ * 未知、非法，或生产构建下低于 78% 阈值时返回 null。
+ */
 export function formatContextCacheHitRateLabel(
   hitRate: number | null | undefined,
   locale: string,
-  options: { showBelowThreshold?: boolean } = {},
+  options: { maximumFractionDigits?: number; showBelowThreshold?: boolean } = {},
 ): string | null {
   if (hitRate === null || hitRate === undefined || !Number.isFinite(hitRate)) {
     return null;
   }
 
-  // 生产面板只露出明显缓存收益，避免低命中率分散对上下文容量的注意力；
+  // 生产构建只露出明显缓存收益，避免低命中率分散对上下文容量的注意力；
   // 开发环境需要观察 provider 的真实低命中值，因此允许绕过 78% 展示阈值。
   if (
     !options.showBelowThreshold &&
@@ -137,52 +159,9 @@ export function formatContextCacheHitRateLabel(
   }
 
   return new Intl.NumberFormat(locale, {
-    maximumFractionDigits: 1,
+    maximumFractionDigits: options.maximumFractionDigits ?? 1,
     style: "percent",
   }).format(Math.max(0, hitRate));
-}
-
-/** 平均输出速率的数值部分（不含单位）；字段缺席或非法时不展示，不回退到最近一次的值。 */
-export function formatContextOutputRateValue(
-  outputRate: Pick<ZCodeContextOutputRate, "averageTokensPerSecond"> | null | undefined,
-  locale: string,
-): string | null {
-  if (!outputRate || !Number.isFinite(outputRate.averageTokensPerSecond)) {
-    return null;
-  }
-
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(
-    Math.max(0, outputRate.averageTokensPerSecond),
-  );
-}
-
-function ContextUsageStatRow({
-  label,
-  separated,
-  testId,
-  title,
-  value,
-}: {
-  label: string;
-  separated: boolean;
-  testId?: string;
-  title?: string;
-  value: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-3 text-ui-sm",
-        separated && "border-t border-border pt-3",
-      )}
-      title={title}
-    >
-      <span className="text-foreground-subtle">{label}</span>
-      <span className="font-mono text-ui-sm text-foreground" data-testid={testId}>
-        {value}
-      </span>
-    </div>
-  );
 }
 
 function getBreakdownToneStyle(index: number): CSSProperties {
@@ -318,10 +297,7 @@ export function ChatContextUsage({
   taskUsage: {
     used: number;
     size: number;
-    cache?: { hitRate: number | null };
     breakdown?: ZCodeContextUsageBreakdownItem[];
-    /** 主轮输出速率聚合快照；缺席时卡片不显示该行（docs/context-output-rate.md）。 */
-    outputRate?: ZCodeContextOutputRate;
   } | null;
   selectedProvider: ZCodeProvider;
   intl: ReturnType<typeof useZCodeIntl>["intl"];
@@ -917,30 +893,17 @@ export function ChatContextUsage({
       },
     );
   }, [intl, numberFormatter, renderableTaskUsage]);
-  const cacheHitRateLabel = useMemo(() => {
-    return formatContextCacheHitRateLabel(
-      renderableTaskUsage?.cache?.hitRate,
-      locale,
-      {
-        showBelowThreshold: import.meta.env.DEV,
-      },
-    );
-  }, [locale, renderableTaskUsage]);
-  const outputRateRow = useMemo(() => {
-    const outputRate = renderableTaskUsage?.outputRate;
-    const value = formatContextOutputRateValue(outputRate, locale);
-    if (!outputRate || value === null) {
-      return null;
-    }
-    // 平均值只覆盖当前运行实例内的主轮请求，冷恢复后会重新开始；用悬停说明标出样本数。
-    return {
-      text: intl.formatMessage({ id: "chat.contextUsage.outputRate.value" }, { value }),
-      title: intl.formatMessage(
-        { id: "chat.contextUsage.outputRate.requestCount" },
-        { count: outputRate.requestCount },
-      ),
-    };
-  }, [intl, locale, renderableTaskUsage?.outputRate]);
+  const contextPercentLabel = useMemo(
+    () =>
+      renderableTaskUsage
+        ? formatContextUsagePercentLabel(
+            renderableTaskUsage.used,
+            renderableTaskUsage.size,
+            locale,
+          )
+        : null,
+    [locale, renderableTaskUsage],
+  );
   const breakdownSegments = useMemo(
     () => buildContextUsageBreakdownSegments(renderableTaskUsage?.breakdown),
     [renderableTaskUsage?.breakdown],
@@ -1029,6 +992,17 @@ export function ChatContextUsage({
             processing 由弹层内「重置」按钮自身展示，触发器不转圈。 */}
         <span className="inline-flex shrink-0">
           <ContextTrigger
+            // 圆环右侧的占用百分比与圆环同属一个触发器；工具栏极窄时随附加信息一起隐藏，只留圆环。
+            label={
+              contextPercentLabel ? (
+                <span
+                  className="tabular-nums group-data-[composer-stats-hidden=true]/toolbar:hidden"
+                  data-testid={TID_CHAT_CONTEXT_USAGE_PERCENT}
+                >
+                  {contextPercentLabel}
+                </span>
+              ) : undefined
+            }
             aria-label={triggerLabel}
             className={cn(
               "text-foreground-subtle",
@@ -1082,67 +1056,38 @@ export function ChatContextUsage({
               />
             </div>
           ) : null}
-          {renderableTaskUsage &&
-          (breakdownSegments.length > 0 ||
-            cacheHitRateLabel ||
-            outputRateRow) ? (
-            <>
-              {breakdownSegments.length > 0 ? (
-                <div
-                  aria-label={intl.formatMessage({
-                    id: "chat.contextUsage.breakdown",
-                  })}
-                  className="space-y-1.5"
-                >
-                  <div className="grid gap-1.5">
-                    {breakdownSegments.map((segment, index) => (
-                      <div
-                        className="flex min-w-0 items-center gap-2 text-ui-sm"
-                        key={segment.source}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="size-2 shrink-0 rounded-sm border border-border"
-                          style={getBreakdownToneStyle(index)}
-                        />
-                        <span className="min-w-0 truncate text-foreground-subtle">
-                          {intl.formatMessage({
-                            id: BREAKDOWN_SOURCE_LABEL_ID[segment.source],
-                          })}
-                        </span>
-                        {/* Bugfix: breakdown 行只展示占比，分项 token 数会和顶部总量口径混在一起造成误读。 */}
-                        <span className="ml-auto min-w-10 shrink-0 text-right font-mono text-ui-sm tabular-nums text-foreground">
-                          {percentageFormatter.format(segment.percent)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {cacheHitRateLabel || outputRateRow ? (
-                <div className="space-y-1.5">
-                  {cacheHitRateLabel ? (
-                    <ContextUsageStatRow
-                      label={intl.formatMessage({
-                        id: "chat.contextUsage.cacheHitRate",
+          {/* 缓存命中率与输出速率显示在工具栏圆环左边（ComposerUsageStats），面板只保留来源明细。 */}
+          {renderableTaskUsage && breakdownSegments.length > 0 ? (
+            <div
+              aria-label={intl.formatMessage({
+                id: "chat.contextUsage.breakdown",
+              })}
+              className="space-y-1.5"
+            >
+              <div className="grid gap-1.5">
+                {breakdownSegments.map((segment, index) => (
+                  <div
+                    className="flex min-w-0 items-center gap-2 text-ui-sm"
+                    key={segment.source}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="size-2 shrink-0 rounded-sm border border-border"
+                      style={getBreakdownToneStyle(index)}
+                    />
+                    <span className="min-w-0 truncate text-foreground-subtle">
+                      {intl.formatMessage({
+                        id: BREAKDOWN_SOURCE_LABEL_ID[segment.source],
                       })}
-                      separated={breakdownSegments.length > 0}
-                      value={cacheHitRateLabel}
-                    />
-                  ) : null}
-                  {outputRateRow ? (
-                    <ContextUsageStatRow
-                      label={intl.formatMessage({ id: "chat.contextUsage.outputRate" })}
-                      // 缓存命中率低于展示阈值时由本行承接与来源明细的分隔线。
-                      separated={breakdownSegments.length > 0 && !cacheHitRateLabel}
-                      testId={TID_CHAT_CONTEXT_USAGE_OUTPUT_RATE}
-                      title={outputRateRow.title}
-                      value={outputRateRow.text}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-            </>
+                    </span>
+                    {/* Bugfix: breakdown 行只展示占比，分项 token 数会和顶部总量口径混在一起造成误读。 */}
+                    <span className="ml-auto min-w-10 shrink-0 text-right font-mono text-ui-sm tabular-nums text-foreground">
+                      {percentageFormatter.format(segment.percent)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : null}
           {codingPlanUsageRemainingWithClose && hasCodingPlanUsageRemaining ? (
             <ChatCodingPlanUsageRemainingPanel
