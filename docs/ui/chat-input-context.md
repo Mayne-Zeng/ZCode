@@ -10,14 +10,16 @@
 ## 当前实现
 
 - `packages/ui/src/v4/composer/V4ComposerToolbar.tsx`
-  - 把 snapshot 的 `usage.contextWindow.usedTokens` / `maxTokens` / cache / breakdown 转成输入栏展示模型
+  - 把 snapshot 的 `usage.contextWindow.usedTokens` / `maxTokens` / cache / breakdown / outputRate 转成输入栏展示模型
   - 复用 `packages/ui/src/chat-input-toolbar/contextUsage.tsx` 的 `ChatContextUsage`
   - 复用已加载的 Z.ai / BigModel Coding Plan entitlement，不在 context 菜单里重复发起 quota 请求
   - Coding Plan `Usage Remaining` 复用 paid Coding Plan 的 entitlement/state 解析工具，但展示入口只保留在输入框 context 和 Usage 页
   - footer badge 与输入框 context 的 Coding Plan entitlement 使用同一套 provider/apiKey 指纹缓存，并对齐 paid plan 查询参数，避免同源额度拆成两份缓存
   - 使用 `ContextTrigger` 作为上下文入口
-  - 使用 `ContextContentBody` 展示上下文窗口占用、breakdown、cache hit rate，以及 Coding Plan `Usage Remaining`
+  - 使用 `ContextContentBody` 展示上下文窗口占用、breakdown、cache hit rate、平均输出速率，以及 Coding Plan `Usage Remaining`
   - cache hit rate 只有在主轮累计命中率大于等于 78% 时展示；低于 78% 的值不在紧凑 context 面板中显示
+  - 展示主轮请求的「平均输出速率」，位于 cache hit rate 行之后，样式与该行一致（subtle label、mono 数值）；值为本地化的一位小数加 `tok/s`，悬停说明标注参与统计的请求数
+  - 平均输出速率只在 snapshot 带 `usage.contextWindow.outputRate` 时渲染，字段缺席（冷恢复后尚未完成请求、旧 CLI）时整行不出现；不设展示阈值，流式期间保持上一次请求结束后的值，不做估算。口径、归属与恢复边界见 [context-output-rate.md](../context-output-rate.md)
   - 输入框 context 内的 Coding Plan 用量独立渲染，不复用 sidebar 菜单面板 UI
 - `packages/ui/src/components/ai-elements/context.tsx`
   - 增加了 0 上限保护，避免进度百分比出现无效值

@@ -5900,6 +5900,8 @@ export class ProductProjection {
                   autoCompactThresholdTokens:
                     this.snapshot.usage.contextWindow?.autoCompactThresholdTokens ?? null,
                   ...(payload.cacheHit ? { cache: payload.cacheHit } : {}),
+                  // 主轮输出速率聚合快照（docs/context-output-rate.md）：runtime 已聚合，投影只透传。
+                  ...(payload.outputRate ? { outputRate: payload.outputRate } : {}),
                   ...(payload.contextUsageBreakdown && payload.contextUsageBreakdown.length > 0
                     ? { breakdown: payload.contextUsageBreakdown }
                     : {}),

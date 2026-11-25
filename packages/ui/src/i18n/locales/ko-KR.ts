@@ -6163,6 +6163,9 @@ const koKR: Record<string, string> = {
   "chat.contextUsageDescription":
     "프롬프트 텍스트, 도구 호출, 응답이 모두 이 컨텍스트 창을 공유합니다.",
   "chat.contextUsage.cacheHitRate": "평균 캐시 적중률",
+  "chat.contextUsage.outputRate": "평균 출력 속도",
+  "chat.contextUsage.outputRate.value": "{value} tok/s",
+  "chat.contextUsage.outputRate.requestCount": "메인 턴 요청 {count}회 기준",
   "chat.contextUsage.breakdown": "컨텍스트 출처",
   "chat.contextUsage.breakdown.messages": "메시지",
   "chat.contextUsage.breakdown.systemPrompt": "시스템 프롬프트",

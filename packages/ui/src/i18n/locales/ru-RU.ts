@@ -6292,6 +6292,9 @@ const ruRU: Record<string, string> = {
   "chat.contextUsageDescription":
     "Текст промпта, вызовы инструментов и ответы используют одно контекстное окно.",
   "chat.contextUsage.cacheHitRate": "Средняя доля попаданий в кэш",
+  "chat.contextUsage.outputRate": "Средняя скорость вывода",
+  "chat.contextUsage.outputRate.value": "{value} tok/s",
+  "chat.contextUsage.outputRate.requestCount": "Запросов основного хода: {count}",
   "chat.contextUsage.breakdown": "Источники контекста",
   "chat.contextUsage.breakdown.messages": "Сообщения",
   "chat.contextUsage.breakdown.systemPrompt": "Системный промпт",

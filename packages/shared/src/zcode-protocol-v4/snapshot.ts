@@ -195,6 +195,19 @@ export type SessionMetaState = z.infer<typeof sessionMetaStateSchema>;
 export type { SharedContextImportState } from "./shared-context-import.js";
 
 // ── usage。conflation：值未变不下发──
+/**
+ * 主轮输出速率的聚合快照（docs/context-output-rate.md）。字段存在即表示至少有一个有效样本。
+ */
+export const zcodeContextOutputRateSchema = z
+  .object({
+    latestTokensPerSecond: z.number().nonnegative(),
+    averageTokensPerSecond: z.number().nonnegative(),
+    requestCount: z.number().int().positive(),
+    totalOutputTokens: z.number().nonnegative(),
+    totalGenerationMs: z.number().positive(),
+  })
+  .strict();
+export type ZCodeContextOutputRate = z.infer<typeof zcodeContextOutputRateSchema>;
 export const sessionUsageStateSchema = z.object({
   contextWindow: z
     .object({
@@ -203,6 +216,7 @@ export const sessionUsageStateSchema = z.object({
       autoCompactThresholdTokens: z.number().nullable(),
       cache: zcodeSessionContextCacheUsageSchema.optional(),
       breakdown: zcodeContextUsageBreakdownSchema.optional(),
+      outputRate: zcodeContextOutputRateSchema.optional(),
     })
     .nullable(),
   cumulative: z.object({

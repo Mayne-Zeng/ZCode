@@ -79,9 +79,11 @@ import {
   recordModelHistoryRound,
 } from "./turn-loop-state.js";
 import {
+  mainTurnOutputRateSnapshot,
   querySourceForTask,
   recordMainTurnCacheHitUsage,
   recordMainTurnModelUsage,
+  recordMainTurnOutputRate,
 } from "./turn-model-step-usage.js";
 import { estimateCurrentModelInputTokens } from "./compact.js";
 import {
@@ -241,6 +243,12 @@ async function runModelBackedTurnStepImpl(
   const recordModelNetworkStatus = (event: ModelNetworkStatusEvent): void => {
     if (event.type === "model_request_started") {
       latestModelRequestId = event.requestId;
+      return;
+    }
+    // 主轮输出速率随每个物理请求的 completed 事件累加（docs/context-output-rate.md）：
+    // 输出续写等一轮多请求时每个请求各计一次，失败或被丢弃的尝试没有 completed 事件。
+    if (querySource === "main_turn" && event.type === "model_request_completed") {
+      recordMainTurnOutputRate(this, event);
       return;
     }
     if (event.type === "model_stream_stalled" || event.type === "model_request_failed") {
@@ -748,6 +756,8 @@ async function runModelBackedTurnStepImpl(
 
   const cacheHit =
     querySource === "main_turn" ? recordMainTurnCacheHitUsage(this, result.usage) : undefined;
+  // 输出速率聚合由 completed 网络事件维护；这里只带快照，重放 ModelComplete 不会再次累加。
+  const outputRate = querySource === "main_turn" ? mainTurnOutputRateSnapshot(this) : undefined;
   // subagent 的文件 checkpoint 已经持久化，但旧 gate 只允许 main_turn 把
   // 汇总写入 ModelComplete，导致 child 详情无法从权威事件恢复摘要和撤销入口。
   const supportsTurnFileChanges = querySource === "main_turn" || querySource === "subagent";
@@ -769,6 +779,7 @@ async function runModelBackedTurnStepImpl(
       stopReason: result.finishReason,
       usage: result.usage,
       ...(cacheHit ? { cacheHit } : {}),
+      ...(outputRate ? { outputRate } : {}),
       ...(fileChanges ? { fileChanges } : {}),
       ...(querySource === "main_turn" && result.contextUsageBreakdown
         ? { contextUsageBreakdown: result.contextUsageBreakdown }

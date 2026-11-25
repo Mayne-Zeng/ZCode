@@ -1166,6 +1166,7 @@ function V4ComposerModelControlsImpl({
       size: contextWindow.maxTokens,
       ...(contextWindow.cache ? { cache: contextWindow.cache } : {}),
       ...(contextWindow.breakdown ? { breakdown: contextWindow.breakdown } : {}),
+      ...(contextWindow.outputRate ? { outputRate: contextWindow.outputRate } : {}),
     };
   }, [usage?.contextWindow]);
   // 工具条热键已转正为命令表命令：tooltip 快捷键文案读生效表，

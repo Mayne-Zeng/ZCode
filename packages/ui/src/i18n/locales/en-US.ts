@@ -6648,6 +6648,10 @@ const enUS: Record<string, string> = {
   "chat.contextUsageDescription":
     "Prompt text, tool calls, and responses all share this context window.",
   "chat.contextUsage.cacheHitRate": "Average cache hit rate",
+  "chat.contextUsage.outputRate": "Average output speed",
+  "chat.contextUsage.outputRate.value": "{value} tok/s",
+  "chat.contextUsage.outputRate.requestCount":
+    "{count, plural, one {Based on # main-turn request} other {Based on # main-turn requests}}",
   "chat.contextUsage.breakdown": "Context sources",
   "chat.contextUsage.breakdown.messages": "Messages",
   "chat.contextUsage.breakdown.systemPrompt": "System prompt",

@@ -4931,6 +4931,15 @@ Memory MEM08 埋点补充（2026-09-17）：现有 Desktop Memory 用例同时�
 
 CLI 全量 lint 被既有 max-lines 错误阻塞；`zcode-protocol.test.ts` 的远程 Cron denylist 与 Account Config 两项断言失败，使用未修改的 server/server-operations 源码复跑同样失败。
 
+## COR：上下文容量卡片的输出速率
+
+| Case  | 状态    | 自动化入口                                                                                                                                                                                   | 覆盖范围                                                                     |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| COR01 | pending | `packages/desktop/test/e2e/conversation-session/context/manual-review/pending/conversation-session-context-output-rate.test.ts`                                                              | desktop continuous 真实 provider replay → 悬停上下文圆环 → 卡片显示平均输出速率 35–45 tok/s |
+| COR02 | focused | `apps/zcode-cli/packages/bootstrap/tests/product-projection.test.ts`、`apps/zcode-cli/packages/core/tests/turn-model-step-output-rate.test.ts`                                               | token 加权平均、旁路与缺失计时不参与、旧事件与冷恢复合成事件不产出字段       |
+
+2026-11-25 本地验证（macOS）：CLI focused tests 通过，`turn-model-step-output-rate.test.ts` 6/6、`product-projection.test.ts` 247/247（core 全量 350 文件 5825 条通过；bootstrap 全量 3876 条通过）。Electron 上 COR01 首轮被基线问题挡在公共准备步骤：`prepareV4ConversationE2E()` 等 `chat-model-select-trigger` 30s 不可点击，遮挡物是后端按 `X-ZCode-App-Version` 定向下发的云端内容弹窗（同一接口带 4.0.0 返回 1 条 popup，带 3.18.2 / 3.18.1 返回 0 条），既有正式用例 DBG01 同症状（run `desktop-e2e-20261124-163853-109`，exit 1）。随后在共享 helper `skipOccupationOnboardingIfPresent` 补上弹窗关闭（页面内哨兵，见开发工作流「共享初始化合同」），**spec 未改**的情况下 COR01 通过 1/1（run `desktop-e2e-20261125-020029-866`，exit 0），卡片显示 `39.9 tok/s`；DBG01 同样恢复通过（run `desktop-e2e-20261125-015846-145`，exit 0）；营销专项回归 `marketing-touch-task-completion`（`keepCloudDialog` 路径）1/1、`marketing-touch-anonymous` 2/2 通过。COR01 仍为 pending，待人工 review 后转正。bootstrap 全量另有 2 条与本组无关的既有失败：`dynamic-mcp-config.test.ts`（HEAD 同样失败）、`session-control/standalone-tui-approval.e2e.test.ts`（本检出未构建 `@zcode/tui`）。
+
 ### RDUX-04 向导回归
 
 场景、运行批次及未验证边界统一见[case 目录](../conversation-session-case-catalog.md#rdux-04-向导回归)；保留原 pending/候选状态，不代表转正或 CI 准入。

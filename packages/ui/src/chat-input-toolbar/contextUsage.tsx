@@ -13,7 +13,11 @@ import {
   type ZCodeContextUsageBreakdownItem,
   type ZCodeProvider,
 } from "@zcode/shared";
-import { TID_CHAT_CONTEXT_USAGE_TRIGGER } from "@zcode/shared/test-ids";
+import type { ZCodeContextOutputRate } from "@zcode/shared/zcode-protocol-v4";
+import {
+  TID_CHAT_CONTEXT_USAGE_OUTPUT_RATE,
+  TID_CHAT_CONTEXT_USAGE_TRIGGER,
+} from "@zcode/shared/test-ids";
 import {
   Context,
   ContextContentBody,
@@ -136,6 +140,49 @@ export function formatContextCacheHitRateLabel(
     maximumFractionDigits: 1,
     style: "percent",
   }).format(Math.max(0, hitRate));
+}
+
+/** 平均输出速率的数值部分（不含单位）；字段缺席或非法时不展示，不回退到最近一次的值。 */
+export function formatContextOutputRateValue(
+  outputRate: Pick<ZCodeContextOutputRate, "averageTokensPerSecond"> | null | undefined,
+  locale: string,
+): string | null {
+  if (!outputRate || !Number.isFinite(outputRate.averageTokensPerSecond)) {
+    return null;
+  }
+
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(
+    Math.max(0, outputRate.averageTokensPerSecond),
+  );
+}
+
+function ContextUsageStatRow({
+  label,
+  separated,
+  testId,
+  title,
+  value,
+}: {
+  label: string;
+  separated: boolean;
+  testId?: string;
+  title?: string;
+  value: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 text-ui-sm",
+        separated && "border-t border-border pt-3",
+      )}
+      title={title}
+    >
+      <span className="text-foreground-subtle">{label}</span>
+      <span className="font-mono text-ui-sm text-foreground" data-testid={testId}>
+        {value}
+      </span>
+    </div>
+  );
 }
 
 function getBreakdownToneStyle(index: number): CSSProperties {
@@ -273,6 +320,8 @@ export function ChatContextUsage({
     size: number;
     cache?: { hitRate: number | null };
     breakdown?: ZCodeContextUsageBreakdownItem[];
+    /** 主轮输出速率聚合快照；缺席时卡片不显示该行（docs/context-output-rate.md）。 */
+    outputRate?: ZCodeContextOutputRate;
   } | null;
   selectedProvider: ZCodeProvider;
   intl: ReturnType<typeof useZCodeIntl>["intl"];
@@ -877,6 +926,21 @@ export function ChatContextUsage({
       },
     );
   }, [locale, renderableTaskUsage]);
+  const outputRateRow = useMemo(() => {
+    const outputRate = renderableTaskUsage?.outputRate;
+    const value = formatContextOutputRateValue(outputRate, locale);
+    if (!outputRate || value === null) {
+      return null;
+    }
+    // 平均值只覆盖当前运行实例内的主轮请求，冷恢复后会重新开始；用悬停说明标出样本数。
+    return {
+      text: intl.formatMessage({ id: "chat.contextUsage.outputRate.value" }, { value }),
+      title: intl.formatMessage(
+        { id: "chat.contextUsage.outputRate.requestCount" },
+        { count: outputRate.requestCount },
+      ),
+    };
+  }, [intl, locale, renderableTaskUsage?.outputRate]);
   const breakdownSegments = useMemo(
     () => buildContextUsageBreakdownSegments(renderableTaskUsage?.breakdown),
     [renderableTaskUsage?.breakdown],
@@ -1019,7 +1083,9 @@ export function ChatContextUsage({
             </div>
           ) : null}
           {renderableTaskUsage &&
-          (breakdownSegments.length > 0 || cacheHitRateLabel) ? (
+          (breakdownSegments.length > 0 ||
+            cacheHitRateLabel ||
+            outputRateRow) ? (
             <>
               {breakdownSegments.length > 0 ? (
                 <div
@@ -1053,22 +1119,27 @@ export function ChatContextUsage({
                   </div>
                 </div>
               ) : null}
-              {cacheHitRateLabel ? (
-                <div
-                  className={cn(
-                    "flex items-center justify-between gap-3 text-ui-sm",
-                    breakdownSegments.length > 0 &&
-                      "border-t border-border pt-3",
-                  )}
-                >
-                  <span className="text-foreground-subtle">
-                    {intl.formatMessage({
-                      id: "chat.contextUsage.cacheHitRate",
-                    })}
-                  </span>
-                  <span className="font-mono text-ui-sm text-foreground">
-                    {cacheHitRateLabel}
-                  </span>
+              {cacheHitRateLabel || outputRateRow ? (
+                <div className="space-y-1.5">
+                  {cacheHitRateLabel ? (
+                    <ContextUsageStatRow
+                      label={intl.formatMessage({
+                        id: "chat.contextUsage.cacheHitRate",
+                      })}
+                      separated={breakdownSegments.length > 0}
+                      value={cacheHitRateLabel}
+                    />
+                  ) : null}
+                  {outputRateRow ? (
+                    <ContextUsageStatRow
+                      label={intl.formatMessage({ id: "chat.contextUsage.outputRate" })}
+                      // 缓存命中率低于展示阈值时由本行承接与来源明细的分隔线。
+                      separated={breakdownSegments.length > 0 && !cacheHitRateLabel}
+                      testId={TID_CHAT_CONTEXT_USAGE_OUTPUT_RATE}
+                      title={outputRateRow.title}
+                      value={outputRateRow.text}
+                    />
+                  ) : null}
                 </div>
               ) : null}
             </>

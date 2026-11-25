@@ -887,6 +887,20 @@ export interface NetworkRequestStatusPayload {
   egress?: HttpClientEgressInfo;
 }
 
+/**
+ * 主轮输出速率的聚合快照（docs/context-output-rate.md）。仅主轮请求携带；运行实例尚无有效样本时缺席。
+ * 平均按 token 加权：totalOutputTokens / (totalGenerationMs / 1000)。
+ */
+export interface ModelCompleteOutputRate {
+  averageTokensPerSecond: number;
+  /** 最近一次有效样本的输出速率（tok/s）。 */
+  latestTokensPerSecond: number;
+  /** 参与平均的主轮请求数量。 */
+  requestCount: number;
+  totalGenerationMs: number;
+  totalOutputTokens: number;
+}
+
 export interface ModelCompletePayload {
   cacheHit?: {
     inputTokens: number;
@@ -903,6 +917,7 @@ export interface ModelCompletePayload {
   contextUsageBreakdown?: ContextUsageBreakdownItem[];
   contextWindow?: number;
   fileChanges?: TurnFileChangeSummary;
+  outputRate?: ModelCompleteOutputRate;
   querySource?: string;
   stopReason: string;
   /** 当前模型请求组装出的完整 tool call 数量；旧事件可能缺失。 */

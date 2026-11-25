@@ -330,6 +330,22 @@ export interface MainTurnCacheHitAggregate {
   totalCacheWriteTokens: number;
 }
 
+/**
+ * 主轮输出速率的累计量（docs/context-output-rate.md）。只在内存：transcript 不持久化网络计时，
+ * resume / rewind 后从空开始，不从消息或历史事件重算。
+ */
+export interface MainTurnOutputRateAggregate {
+  latestTokensPerSecond: number;
+  requestCount: number;
+  totalGenerationMs: number;
+  totalOutputTokens: number;
+}
+
+/** 随主轮 `ModelComplete` 发出的聚合快照；`averageTokensPerSecond` 由三个计数器得出。 */
+export type MainTurnOutputRateSnapshot = MainTurnOutputRateAggregate & {
+  averageTokensPerSecond: number;
+};
+
 export type BackgroundTaskNotificationSealReason = "subagent_terminal" | "subagent_cancelled";
 
 export interface SealBackgroundTaskNotificationsInput {

@@ -6314,6 +6314,9 @@ const jaJP: Record<string, string> = {
   "chat.contextUsageDescription":
     "プロンプトのテキスト、ツール呼び出し、応答はすべてこのコンテキストウィンドウを共有します。",
   "chat.contextUsage.cacheHitRate": "平均キャッシュヒット率",
+  "chat.contextUsage.outputRate": "平均出力速度",
+  "chat.contextUsage.outputRate.value": "{value} tok/s",
+  "chat.contextUsage.outputRate.requestCount": "メイントーンのリクエスト {count} 件に基づく",
   "chat.contextUsage.breakdown": "コンテキストのソース",
   "chat.contextUsage.breakdown.messages": "メッセージ",
   "chat.contextUsage.breakdown.systemPrompt": "システムプロンプト",

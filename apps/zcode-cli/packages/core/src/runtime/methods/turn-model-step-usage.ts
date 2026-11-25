@@ -1,6 +1,18 @@
 import { createModelUsageSummaryFromEvents } from "../deps.js";
-import type { MessageId, MessageWithParts, Model, ModelUsage, TraceContext } from "../deps.js";
-import type { MainTurnCacheHitAggregate, RuntimeModelTextResult } from "../types.js";
+import { calculateOutputTps } from "@zcode/shared";
+import type {
+  MessageId,
+  MessageWithParts,
+  Model,
+  ModelNetworkStatusEvent,
+  ModelUsage,
+  TraceContext,
+} from "../deps.js";
+import type {
+  MainTurnCacheHitAggregate,
+  MainTurnOutputRateSnapshot,
+  RuntimeModelTextResult,
+} from "../types.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { RegularTurnLoopState } from "./turn-loop-state.js";
 import type { RuntimeMessageEntry } from "../../agent/message-history.js";
@@ -168,6 +180,51 @@ export function recordMainTurnCacheHitUsage(
     totalInputTokens: aggregate.totalInputTokens,
     totalCacheReadTokens: aggregate.totalCacheReadTokens,
     totalCacheWriteTokens: aggregate.totalCacheWriteTokens,
+  };
+}
+
+/**
+ * 累加一次主轮模型请求的输出速率样本（docs/context-output-rate.md）。
+ * 生成时长与开发者工具面板同一定义：durationMs − timeToFirstContentMs，两者都有且前者更大时才有准确值；
+ * 缺少线级计时的请求不参与，不得退回 durationMs。返回本次样本，样本无效时返回 null。
+ */
+export function recordMainTurnOutputRate(
+  runtime: AgentRuntimeInternal,
+  completed: Extract<ModelNetworkStatusEvent, { type: "model_request_completed" }>,
+): number | null {
+  const firstContentMs = completed.timeToFirstContentMs;
+  const generationMs =
+    firstContentMs !== undefined &&
+    Number.isFinite(completed.durationMs) &&
+    completed.durationMs > firstContentMs
+      ? completed.durationMs - firstContentMs
+      : null;
+  const outputTokens = nonNegativeInteger(completed.usage?.outputTokens);
+  const tokensPerSecond = calculateOutputTps(outputTokens, generationMs);
+  if (tokensPerSecond === null || outputTokens === undefined || generationMs === null) return null;
+
+  const aggregate = runtime.mainTurnOutputRateAggregate;
+  runtime.mainTurnOutputRateAggregate = {
+    latestTokensPerSecond: tokensPerSecond,
+    requestCount: aggregate.requestCount + 1,
+    totalGenerationMs: aggregate.totalGenerationMs + generationMs,
+    totalOutputTokens: aggregate.totalOutputTokens + outputTokens,
+  };
+  return tokensPerSecond;
+}
+
+/** 当前聚合快照；运行实例尚无有效样本时返回 undefined，调用方不产出该字段。 */
+export function mainTurnOutputRateSnapshot(
+  runtime: AgentRuntimeInternal,
+): MainTurnOutputRateSnapshot | undefined {
+  const aggregate = runtime.mainTurnOutputRateAggregate;
+  if (aggregate.requestCount <= 0 || aggregate.totalGenerationMs <= 0) return undefined;
+  return {
+    averageTokensPerSecond: (aggregate.totalOutputTokens * 1000) / aggregate.totalGenerationMs,
+    latestTokensPerSecond: aggregate.latestTokensPerSecond,
+    requestCount: aggregate.requestCount,
+    totalGenerationMs: aggregate.totalGenerationMs,
+    totalOutputTokens: aggregate.totalOutputTokens,
   };
 }
 

@@ -580,6 +580,8 @@ export const TID_CHAT_MODE_SELECT_TRIGGER = "chat-mode-select-trigger";
 export const TID_CHAT_MODE_SELECT_ITEM = "chat-mode-select-item";
 /** 聊天工具栏 context 消耗按钮 */
 export const TID_CHAT_CONTEXT_USAGE_TRIGGER = "chat-context-usage-trigger";
+/** context 面板「平均输出速率」行的数值 */
+export const TID_CHAT_CONTEXT_USAGE_OUTPUT_RATE = "chat-context-usage-output-rate";
 /** 思考块折叠触发按钮 */
 export const TID_CHAT_REASONING_TRIGGER = "chat-reasoning-trigger";
 /** 思考块折叠内容容器 */

@@ -116,3 +116,6 @@ output lasts only 100 ms. Missing wire timing stays unknown; SDK synthetic start
 times are not fallbacks. Workspace/task switching, desktop/mobile widths and light/dark themes
 preserve isolation and readability. Read-only protocol tests and browser integration evidence remain separate from
 formal desktop E2E admission.
+
+The context card's average output rate aggregates the same per-request value over main-turn
+requests; see [context-output-rate.md](./context-output-rate.md).

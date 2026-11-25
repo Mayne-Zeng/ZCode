@@ -125,6 +125,7 @@ import type {
   PendingModelChangeTimeline,
   PermissionDecisionResult,
   MainTurnCacheHitAggregate,
+  MainTurnOutputRateAggregate,
   RuntimeTurnFileChangeMap,
   ResumeSessionOptions,
   ResumeSessionResult,
@@ -274,6 +275,12 @@ export class AgentRuntime {
     totalInputTokens: 0,
     totalCacheReadTokens: 0,
     totalCacheWriteTokens: 0,
+  };
+  private mainTurnOutputRateAggregate: MainTurnOutputRateAggregate = {
+    latestTokensPerSecond: 0,
+    requestCount: 0,
+    totalGenerationMs: 0,
+    totalOutputTokens: 0,
   };
   private totalTokensBudget: TotalTokensBudgetState = createTotalTokensBudgetState();
   private currentTurnFileChanges: RuntimeTurnFileChangeMap = new Map();

@@ -1304,6 +1304,93 @@ describe("ProductProjection 黄金测试（L1）", () => {
     expect(projection.getSnapshot().usage.contextWindow).toBeNull();
   });
 
+  // docs/context-output-rate.md：runtime 已聚合，投影只透传；字段缺席时不补造。
+  describe("A：主轮输出速率 outputRate", () => {
+    const OUTPUT_RATE = {
+      averageTokensPerSecond: 105,
+      latestTokensPerSecond: 300,
+      requestCount: 2,
+      totalGenerationMs: 4_000,
+      totalOutputTokens: 420,
+    };
+
+    function mainTurnComplete(outputRate: typeof OUTPUT_RATE | undefined, outputTokens: number) {
+      return {
+        content: "done",
+        querySource: "main_turn",
+        stopReason: "end_turn",
+        usage: { inputTokens: 100, outputTokens },
+        ...(outputRate ? { outputRate } : {}),
+      };
+    }
+
+    it("主轮次 ModelComplete 的 outputRate 透传到 usage.contextWindow", () => {
+      const log = new EventLog();
+      log.push(SessionEventType.SessionCreated, { mode: "default", contextWindow: 200_000 });
+      log.push(SessionEventType.TurnStarted, { turnNumber: 1, input: "hi" }, { turnId: "turn-1" });
+      log.push(SessionEventType.ModelComplete, mainTurnComplete(OUTPUT_RATE, 20), {
+        turnId: "turn-1",
+      });
+
+      const { projection } = runAll(log.events);
+
+      expect(projection.getSnapshot().usage.contextWindow).toMatchObject({
+        usedTokens: 120,
+        outputRate: OUTPUT_RATE,
+      });
+    });
+
+    it("不带 outputRate 的 ModelComplete（旧事件 / 冷恢复合成）不产出该字段，并以最近一次主轮为准", () => {
+      const log = new EventLog();
+      log.push(SessionEventType.SessionCreated, { mode: "default", contextWindow: 200_000 });
+      log.push(SessionEventType.TurnStarted, { turnNumber: 1, input: "hi" }, { turnId: "turn-1" });
+      const projection = new ProductProjection("session-1", "epoch-1");
+      for (const event of log.events) projection.applyEvent(event);
+      const contextWindow = () => projection.getSnapshot().usage.contextWindow;
+      const applyComplete = (outputRate: typeof OUTPUT_RATE | undefined, outputTokens: number) =>
+        projection.applyEvent(
+          log.push(SessionEventType.ModelComplete, mainTurnComplete(outputRate, outputTokens), {
+            turnId: "turn-1",
+          }),
+        );
+
+      applyComplete(undefined, 20);
+      expect(contextWindow()?.outputRate).toBeUndefined();
+
+      const deltas = applyComplete(OUTPUT_RATE, 30);
+      expect(contextWindow()?.outputRate).toEqual(OUTPUT_RATE);
+      // state.updated 整体替换 usage，新字段随同一次 patch 下发。
+      expect(deltas).toContainEqual(
+        expect.objectContaining({
+          op: "state.updated",
+          patch: expect.objectContaining({
+            usage: expect.objectContaining({
+              contextWindow: expect.objectContaining({ outputRate: OUTPUT_RATE }),
+            }),
+          }),
+        }),
+      );
+
+      applyComplete(undefined, 40);
+      expect(contextWindow()?.outputRate).toBeUndefined();
+    });
+
+    it("sidecar 携带 outputRate 时不进入输入栏", () => {
+      const log = new EventLog();
+      log.push(SessionEventType.SessionCreated, { mode: "default", contextWindow: 200_000 });
+      log.push(SessionEventType.TurnStarted, { turnNumber: 1, input: "hi" }, { turnId: "turn-1" });
+      log.push(
+        SessionEventType.ModelComplete,
+        { ...mainTurnComplete(OUTPUT_RATE, 20), querySource: "session_title" },
+        { turnId: "turn-1" },
+      );
+
+      const { projection } = runAll(log.events);
+
+      expect(projection.getSnapshot().usage.contextWindow).toBeNull();
+    });
+  });
+
   it("A：running 期 inputRouting=enqueue，完成后 startNow", () => {
     const log = new EventLog();
     log.push(SessionEventType.SessionCreated, { mode: "default", contextWindow: 1000 });

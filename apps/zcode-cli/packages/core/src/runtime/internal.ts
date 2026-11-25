@@ -53,6 +53,7 @@ import type {
   PendingModelChangeTimeline,
   ProviderRuntimeHeadersPort,
   MainTurnCacheHitAggregate,
+  MainTurnOutputRateAggregate,
   McpStartupPolicy,
   RuntimeTurnFileChangeMap,
 } from "./types.js";
@@ -204,6 +205,8 @@ export interface AgentRuntimeInternal
   latestAssistantMessageId?: MessageId;
   latestAssistantTurnId?: TurnId;
   mainTurnCacheHitAggregate: MainTurnCacheHitAggregate;
+  /** 主轮输出速率累计量；只在内存，resume / rewind 后从空开始（docs/context-output-rate.md）。 */
+  mainTurnOutputRateAggregate: MainTurnOutputRateAggregate;
   /** token 预算倒数的计数器；只在内存，resume 时重新开始。 */
   totalTokensBudget: TotalTokensBudgetState;
   currentTurnFileChanges: RuntimeTurnFileChangeMap;
