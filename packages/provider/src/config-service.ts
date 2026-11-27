@@ -365,6 +365,58 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
     });
   }
 
+  /**
+   * Codex 订阅模型同步使用替换语义：只重写目标 Provider 的个人模型成员与手动规则，
+   * 不保留上次同步已从账号目录消失的模型，也不触碰其它 Provider。
+   */
+  async replacePersonalModels(
+    providerId: ProviderId,
+    models: readonly { readonly modelId: ModelId; readonly config: ModelConfig }[],
+  ): Promise<ProviderConfigLayerSnapshot> {
+    const normalizedProviderId = normalizeId("providerId", providerId);
+    const zcodeBuiltin = await this.#zcodeBuiltinSource.read();
+    return this.#updatePersonal((current) => {
+      const provider = writableProviderOverlay(zcodeBuiltin, current, normalizedProviderId);
+      const builtinModelIds = resolveProviderBuiltinModelIds(
+        zcodeBuiltin,
+        current.providers,
+        normalizedProviderId,
+      );
+      const seen = new Set<string>();
+      const modelIds: ModelId[] = [];
+      for (const model of models) {
+        const modelId = normalizeId("modelId", model.modelId);
+        if (builtinModelIds.includes(modelId)) {
+          throw new Error(
+            `Built-in Model 不能写入个人模型列表: ${normalizedProviderId}/${modelId}`,
+          );
+        }
+        if (seen.has(modelId)) {
+          throw new Error(`Model 重复: ${normalizedProviderId}/${modelId}`);
+        }
+        seen.add(modelId);
+        modelIds.push(modelId);
+      }
+      let rules = current.models.deleteExactForProvider(normalizedProviderId);
+      for (const model of models) {
+        rules = rules.setExact(
+          normalizedProviderId,
+          model.modelId.trim(),
+          model.config.overlay(new ModelConfig({ enabled: true })),
+          false,
+        );
+      }
+      return {
+        providers: current.providers.set(
+          normalizedProviderId,
+          provider.withPersonalModelIds(modelIds).withModelOrder(modelIds),
+        ),
+        models: rules,
+        providerOrder: current.providerOrder,
+      };
+    });
+  }
+
   async renamePersonalModel(
     providerId: ProviderId,
     currentModelId: ModelId,

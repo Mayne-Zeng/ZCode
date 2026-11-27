@@ -1,5 +1,5 @@
 import type { ProviderSettingsView } from "@zcode/services";
-import { ArrowLeftIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
+import { ArrowLeftIcon, ChevronRightIcon, PlusIcon, SparklesIcon } from "lucide-react";
 import { resolveProviderTemplateName } from "@zcode/provider";
 import { OFFICIAL_PROVIDER_TEMPLATE_IDS, toZhOrEnLocale } from "@zcode/shared";
 import type { ReactNode } from "react";
@@ -24,12 +24,16 @@ export function ProviderTemplatePicker({
   onBack,
   onCreateFromTemplate,
   onCreateCustom,
+  onCreateCodexSubscription,
+  codexSubscriptionSupported,
   creating,
 }: {
   templates: ProviderSettingsView["providerTemplates"];
   onBack: () => void;
   onCreateFromTemplate: ProviderTemplateCreate;
   onCreateCustom: CustomProviderCreate;
+  onCreateCodexSubscription: () => Promise<void>;
+  codexSubscriptionSupported: boolean;
   creating: boolean;
 }) {
   const { intl, locale } = useZCodeIntl();
@@ -96,17 +100,36 @@ export function ProviderTemplatePicker({
             </h3>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {group.id === "other" ? (
-                <ProviderTemplateCard
-                  label={intl.formatMessage({ id: "settings.modelProvider.createCustomProvider" })}
-                  disabled={creating}
-                  testId={testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, "custom")}
-                  icon={
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover">
-                      <PlusIcon className="size-4" aria-hidden="true" />
-                    </span>
-                  }
-                  onClick={() => void createWithFeedback(() => onCreateCustom(customLabel))}
-                />
+                <>
+                  {codexSubscriptionSupported ? (
+                    <ProviderTemplateCard
+                      label={intl.formatMessage({
+                        id: "settings.modelProvider.codexSubscription.create",
+                      })}
+                      disabled={creating}
+                      testId={testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, "codex-subscription")}
+                      icon={
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover">
+                          <SparklesIcon className="size-4" aria-hidden="true" />
+                        </span>
+                      }
+                      onClick={() => void createWithFeedback(onCreateCodexSubscription)}
+                    />
+                  ) : null}
+                  <ProviderTemplateCard
+                    label={intl.formatMessage({
+                      id: "settings.modelProvider.createCustomProvider",
+                    })}
+                    disabled={creating}
+                    testId={testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, "custom")}
+                    icon={
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover">
+                        <PlusIcon className="size-4" aria-hidden="true" />
+                      </span>
+                    }
+                    onClick={() => void createWithFeedback(() => onCreateCustom(customLabel))}
+                  />
+                </>
               ) : null}
               {group.templates.map((template) => {
                 const label = resolveProviderTemplateName(

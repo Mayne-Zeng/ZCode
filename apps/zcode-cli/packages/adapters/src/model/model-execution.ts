@@ -26,6 +26,7 @@ import { createAnthropicCompatFetch } from "./anthropic-stream-compat.js";
 import { createModelRequestSecurityState } from "./request-security-edition/index.js";
 import type { ModelRequestSecurityState, ModelRequestSecurityPort } from "./request-security.js";
 import { createOpenAIResponsesJsonCompatFetch } from "./openai-responses-json-compat.js";
+import { createCodexOAuthFetch } from "./codex-oauth-fetch.js";
 import { createModelOptionMapFetch, type RawRequestBodyCapture } from "./model-option-map-fetch.js";
 import { createNetworkProxyFetch } from "../network/proxy-fetch.js";
 import { createProviderEndpointRoutingFetch } from "./provider-endpoint-routing-fetch.js";
@@ -333,10 +334,15 @@ export class AiSdkModelExecution {
 
     switch (providerConfig.kind) {
       case "openai": {
+        // Codex 订阅上游固定无状态流式；非流式辅助调用由本地聚合回 JSON。
+        const responsesFetch =
+          providerConfig.access?.type === "codex-oauth"
+            ? createCodexOAuthFetch(optionFetch)
+            : optionFetch;
         const provider = createOpenAI({
           apiKey,
           baseURL: providerConfig.baseURL,
-          fetch: createOpenAIResponsesJsonCompatFetch(optionFetch),
+          fetch: createOpenAIResponsesJsonCompatFetch(responsesFetch),
           headers,
         });
         return provider.responses as LanguageModelFactory;
@@ -404,10 +410,12 @@ function toAiSdkProviderConfig(
   providerId: string,
   config: RegistryProviderConfig,
 ): AiSdkProviderConfig {
+  const staticApiKey =
+    config.access.type === "api-key" || config.access.type === "zhipu-coding-plan-api-key"
+      ? config.access.apiKey
+      : undefined;
   const common = {
-    ...(config.access.type !== "zhipu-account" && config.access.apiKey
-      ? { apiKey: config.access.apiKey }
-      : {}),
+    ...(staticApiKey ? { apiKey: staticApiKey } : {}),
     baseURL: config.api.baseUrl,
     ...(config.api.headers ? { headers: { ...config.api.headers } } : {}),
     providerOptions: { apiFormat: config.api.type },
@@ -460,10 +468,10 @@ function applyModelRequestAuth(
   if (!requestAuth) return providerConfig;
   const staticHeaders = withoutRequestVerificationHeaders(providerConfig.headers);
   // 账号动态身份头必须先清理静态认证头，避免 SDK 优先使用旧凭据。
-  const headers =
-    providerConfig.access.type === "zhipu-account"
-      ? withoutModelAuthHeaders(staticHeaders)
-      : staticHeaders;
+  const runtimeAuth =
+    providerConfig.access.type === "zhipu-account" ||
+    providerConfig.access.type === "codex-oauth";
+  const headers = runtimeAuth ? withoutModelAuthHeaders(staticHeaders) : staticHeaders;
   return {
     ...providerConfig,
     ...(requestAuth.apiKey ? { apiKey: requestAuth.apiKey } : {}),

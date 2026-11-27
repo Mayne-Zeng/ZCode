@@ -4,6 +4,7 @@ import type { z } from "zod";
 import {
   completeApiKeyAccessDataSchema,
   completeZhipuAccountAccessDataSchema,
+  completeCodexOAuthAccessDataSchema,
   completeProviderApiDataSchema,
   completeProviderConfigDataSchema,
   type providerApiTypeDataSchema,
@@ -13,6 +14,7 @@ import {
   type providerLogoDataSchema,
   type apiKeyAccessDataSchema,
   type zhipuAccountAccessDataSchema,
+  type codexOAuthAccessDataSchema,
   type providerAccessDataSchema,
   type providerApiDataSchema,
   type providerConfigDataSchema,
@@ -111,7 +113,32 @@ export class ZhipuAccountAccessConfig extends ConfigOverlay<ZhipuAccountAccessCo
   }
 }
 
-export type ProviderAccessConfig = ApiKeyAccessConfig | ZhipuAccountAccessConfig;
+export type CodexOAuthAccessConfigObject = Readonly<z.infer<typeof codexOAuthAccessDataSchema>>;
+
+/**
+ * ChatGPT 订阅登录的 Provider Access。没有可编辑叶子：token 由 Host 凭据服务持有，
+ * 这里只表达"这个 Provider 走 Codex OAuth 运行时鉴权"。
+ */
+export class CodexOAuthAccessConfig extends ConfigOverlay<CodexOAuthAccessConfig> {
+  readonly type = "codex-oauth" as const;
+
+  overlay(_next?: CodexOAuthAccessConfig): CodexOAuthAccessConfig {
+    return this;
+  }
+
+  validateComplete(path: readonly string[] = []): readonly ConfigValidationIssue[] {
+    return validateConfigSchema(completeCodexOAuthAccessDataSchema, this.toJSON(), path);
+  }
+
+  toJSON(): CodexOAuthAccessConfigObject {
+    return { type: this.type };
+  }
+}
+
+export type ProviderAccessConfig =
+  | ApiKeyAccessConfig
+  | ZhipuAccountAccessConfig
+  | CodexOAuthAccessConfig;
 
 export type ProviderAccessConfigObject = Readonly<z.infer<typeof providerAccessDataSchema>>;
 
@@ -505,6 +532,8 @@ function overlayProviderAccess(
       return current.overlay(next as ApiKeyAccessConfig);
     case "zhipu-account":
       return current.overlay(next as ZhipuAccountAccessConfig);
+    case "codex-oauth":
+      return current.overlay(next as CodexOAuthAccessConfig);
   }
 }
 

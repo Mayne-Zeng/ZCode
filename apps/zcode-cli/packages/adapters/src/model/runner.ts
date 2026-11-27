@@ -190,8 +190,11 @@ export class AiSdkModelAdapter {
         options.providerConfig.access.type === "zhipu-account" &&
         (options.providerConfig.access.mode === "off-peak" ||
           options.providerConfig.access.mode === "highspeed");
-      // 调用级 runtime header Port 只服务绑定完整 Account Access 的账号型 Model；
-      // 普通 API-key Model 若也消费该 Port，会把静态鉴权误送到 Host 刷新并在请求前失败。
+      // zhipu-account 与 codex-oauth 都要求在每次真实请求前向 Host 取动态凭据；
+      // 普通 API-key Model 不进入该分支，避免把静态鉴权误送到 Host 刷新。
+      const runtimeAuthAccess =
+        options.providerConfig.access.type === "zhipu-account" ||
+        options.providerConfig.access.type === "codex-oauth";
       // 派生模式保留执行作用域票据/卡身份；Off-Peak 的 PAT 仍逐请求向原账号 owner 刷新。
       const refreshRuntimeHeadersBeforeAttempt = requestAuthRequired
         ? async (input: ModelRequestAuthSourceInput) => {
@@ -214,7 +217,7 @@ export class AiSdkModelAdapter {
                 : requestAuth;
             return { headersApplied: true, requestAuth: refreshedAuth };
           }
-        : options.providerConfig.access.type === "zhipu-account"
+        : runtimeAuthAccess
           ? (contextRefreshRuntimeHeadersBeforeAttempt ??
             (async () => {
               throw new ModelProtocolError(

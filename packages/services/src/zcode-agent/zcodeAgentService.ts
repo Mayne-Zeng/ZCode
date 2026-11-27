@@ -1158,6 +1158,14 @@ interface CreateZCodeAgentServiceBaseOptions extends Omit<
   accountProviderConfigSource?: ProviderSource<AccountProviderConfigSnapshot>;
   /** Desktop Host 请求 Main 登记 Agent 已授权的精确本地视频路径。 */
   authorizeLocalMediaPreviewPath?: (path: string) => Promise<string>;
+  /**
+   * 非 zhipu-account 的运行时鉴权 Provider（当前为 codex-oauth）由 Host 按 providerId
+   * 解析；Host 必须先校验自己的 Provider 配置，不能把 token 下发给任意地址。
+   */
+  resolveProviderRequestAuth?: (input: {
+    readonly providerId: string;
+    readonly modelId: string;
+  }) => Promise<AccountRequestAuthMaterial | undefined>;
   modelSelectionReadinessSource?: ModelSelectionReadinessSource;
   prepareRuntimeWorkspace?: (workspace: ZCodeAgentWorkspaceTarget) => Promise<void>;
   readSubagentRuntimeConfig?: (workspace: {
@@ -1731,6 +1739,7 @@ export function createZCodeAgentService(
   const accountConfigReceivedRevisionByClient = new WeakMap<ZCodeProtocolClient, string>();
   const sessionTraceIdBySessionKey = new Map<string, TraceId>();
   const accountRequestAuthService = options?.accountRequestAuthService;
+  const resolveProviderRequestAuth = options?.resolveProviderRequestAuth;
   const accountProviderConfigSource = options?.accountProviderConfigSource;
   const modelSelectionReadinessSource = options?.modelSelectionReadinessSource;
   const sessionRuntimePreferencesAuthority = options?.sessionRuntimePreferencesAuthority ?? "local";
@@ -1790,17 +1799,24 @@ export function createZCodeAgentService(
   async function resolveAccountRequestAuth(
     request: ZCodeProviderRuntimeHeadersRequestParams,
   ): Promise<AccountRequestAuthMaterial | undefined> {
-    if (!request.accountAccess || !accountRequestAuthService) {
-      return undefined;
+    if (request.accountAccess && accountRequestAuthService) {
+      return accountRequestAuthService.resolveCurrent({
+        providerId: request.providerId,
+        modelId: request.modelSelection.modelId,
+        accountAccess: request.accountAccess,
+        expectedAccountScope: request.expectedAccountScope,
+        rejectedProjectTokenFingerprint: request.rejectedProjectTokenFingerprint,
+        reason: request.reason,
+      });
     }
-    return accountRequestAuthService.resolveCurrent({
-      providerId: request.providerId,
-      modelId: request.modelSelection.modelId,
-      accountAccess: request.accountAccess,
-      expectedAccountScope: request.expectedAccountScope,
-      rejectedProjectTokenFingerprint: request.rejectedProjectTokenFingerprint,
-      reason: request.reason,
-    });
+    // codex-oauth 没有 accountAccess 载荷，Host 只能按 providerId 回查自己的 Provider 配置。
+    if (resolveProviderRequestAuth) {
+      return resolveProviderRequestAuth({
+        providerId: request.providerId,
+        modelId: request.modelSelection.modelId,
+      });
+    }
+    return undefined;
   }
 
   async function respondAccountRequestAuthWithoutInteraction(params: {
@@ -1895,13 +1911,16 @@ export function createZCodeAgentService(
         // Host 绑定同一快照后再决定是否投递；跳过时直接复用账号鉴权，不等待界面。
         pending.request = { ...pending.request, requestVerificationConfig: config };
       }
-      if (
-        accountRequestAuthService &&
-        access &&
-        !requiresRequestVerification(access, pending.request.requestVerificationConfig)
-      ) {
-        await respondAccountRequestAuthWithoutInteraction({ key, pending });
-        return;
+      if ((accountRequestAuthService && access) || (!access && resolveProviderRequestAuth)) {
+        // 带 accountAccess 的账号 Provider 走账号凭据；没有 accountAccess 的 codex-oauth
+        // 由 Host 按 providerId 回查 Provider 配置后解析。两者都不需要 UI 交互。
+        if (
+          !access ||
+          !requiresRequestVerification(access, pending.request.requestVerificationConfig)
+        ) {
+          await respondAccountRequestAuthWithoutInteraction({ key, pending });
+          return;
+        }
       }
       if (!requestVerificationInteractionAvailable)
         throw new Error("Provider request auth is unavailable");

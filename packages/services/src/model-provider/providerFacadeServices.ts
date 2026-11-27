@@ -19,6 +19,11 @@ import {
 import { createServiceDescriptor } from "../descriptors.js";
 import type { ModelConnectivityResult } from "@zcode/shared";
 import { createServiceLogger } from "../logger/serviceLogger.js";
+import {
+  type CodexSubscriptionModel,
+  type CodexSubscriptionStatus,
+  isAllowedCodexBaseUrl,
+} from "./codexSubscriptionTypes.js";
 
 export type {
   ProviderSettingsProviderView,
@@ -26,6 +31,49 @@ export type {
   ModelSelectionViewInput,
   ProviderSettingsView,
 } from "@zcode/provider";
+export type { CodexSubscriptionModel, CodexSubscriptionStatus };
+
+const CODEX_REASONING_LEVEL_MAP =
+  '{"reasoning":{"effort":reasoningLevel == "disabled" ? "none" : reasoningLevel == "enabled" ? "high" : reasoningLevel}}';
+const CODEX_DEFAULT_CONTEXT_WINDOW = 272_000;
+const CODEX_DEFAULT_MAX_OUTPUT_TOKENS = 128_000;
+
+/** Host 侧 Codex 登录能力；远端 Host 未装配时由设置服务报告 supported=false。 */
+export interface CodexSubscriptionSettingsPort {
+  getStatus(): Promise<CodexSubscriptionStatus>;
+  startLogin(): Promise<{ authorizeUrl: string }>;
+  cancelLogin(): Promise<void>;
+  logout(): Promise<void>;
+  listModels(): Promise<readonly CodexSubscriptionModel[]>;
+  dispose?(): Promise<void> | void;
+}
+
+function codexModelConfigObject(model: CodexSubscriptionModel): ModelConfigObject {
+  const efforts = [...new Set(model.reasoningEfforts)];
+  return {
+    enabled: true,
+    properties: {
+      contextWindow: model.contextWindow ?? CODEX_DEFAULT_CONTEXT_WINDOW,
+      supportsJsonSchemaOutput: true,
+      supportsNativeWebSearch: false,
+      supportsMidConversationSystem: false,
+      inputFormat: {
+        supportsImage: model.supportsImage,
+        supportsVideo: false,
+        supportsPdf: model.supportsPdf,
+      },
+    },
+    optionSpecs: {
+      reasoningLevel:
+        efforts.length > 0
+          ? { values: efforts, map: CODEX_REASONING_LEVEL_MAP }
+          : { values: ["disabled"], map: "{}" },
+      maxOutputTokens: {
+        max: model.maxOutputTokens ?? CODEX_DEFAULT_MAX_OUTPUT_TOKENS,
+      },
+    },
+  };
+}
 
 export interface IProviderSettingsService {
   readonly onDidChange: Event<ProviderSettingsView>;
@@ -68,6 +116,11 @@ export interface IProviderSettingsService {
   testModelConnectivity(
     input: ProviderSettingsConnectivityRequest,
   ): Promise<ModelConnectivityResult>;
+  getCodexSubscriptionStatus(): Promise<CodexSubscriptionStatus>;
+  startCodexSubscriptionLogin(): Promise<{ authorizeUrl: string }>;
+  cancelCodexSubscriptionLogin(): Promise<void>;
+  logoutCodexSubscription(): Promise<void>;
+  syncCodexSubscriptionModels(providerId: ProviderId): Promise<ProviderSettingsView>;
 }
 
 export const IProviderSettingsService = createServiceDescriptor<IProviderSettingsService>(
@@ -110,6 +163,7 @@ export function createProviderSettingsService(
   facade: ProviderSettingsFacade,
   ensureReady: () => Promise<void> = async () => {},
   testConnectivity?: ProviderSettingsConnectivityTester,
+  codexSubscription?: CodexSubscriptionSettingsPort,
 ): IProviderSettingsService {
   return {
     onDidChange: toEvent((listener) => facade.onDidChange(listener)),
@@ -205,6 +259,57 @@ export function createProviderSettingsService(
         providerId: input.providerId,
         modelId: input.modelId,
       });
+    },
+    getCodexSubscriptionStatus: async () => {
+      if (!codexSubscription) return { supported: false, state: "signed-out" };
+      return codexSubscription.getStatus();
+    },
+    startCodexSubscriptionLogin: async () => {
+      if (!codexSubscription) {
+        throw new Error("当前 Environment 未装配 Codex 订阅登录能力");
+      }
+      return codexSubscription.startLogin();
+    },
+    cancelCodexSubscriptionLogin: async () => {
+      if (!codexSubscription) return;
+      await codexSubscription.cancelLogin();
+    },
+    logoutCodexSubscription: async () => {
+      if (!codexSubscription) {
+        throw new Error("当前 Environment 未装配 Codex 订阅登录能力");
+      }
+      await codexSubscription.logout();
+    },
+    syncCodexSubscriptionModels: async (providerId) => {
+      await ensureReady();
+      if (!codexSubscription) {
+        throw new Error("当前 Environment 未装配 Codex 订阅登录能力");
+      }
+      await facade.waitForProviderOperations(providerId);
+      const provider = facade.getView().providers.find((item) => item.providerId === providerId);
+      if (!provider) throw new Error(`Provider 不存在: ${providerId}`);
+      // 只在 Host 自己的 Registry 事实里校验接入方式与端点；Renderer 传入的 providerId
+      // 不能成为把订阅 token 带到任意 Provider 的凭据。
+      if (provider.effectiveConfig.access?.type !== "codex-oauth") {
+        throw new Error(`Provider 不是 Codex 订阅接入: ${providerId}`);
+      }
+      if (provider.effectiveConfig.api?.type !== "openai-responses") {
+        throw new Error(`Codex 订阅 Provider 必须使用 openai-responses: ${providerId}`);
+      }
+      if (!isAllowedCodexBaseUrl(provider.effectiveConfig.api?.baseUrl)) {
+        throw new Error("Codex 订阅 Provider 的 Base URL 必须指向 ChatGPT Codex 端点");
+      }
+      const models = await codexSubscription.listModels();
+      if (models.length === 0) {
+        throw new Error("ChatGPT 账号没有返回可用的 Codex 模型");
+      }
+      return facade.replacePersonalModels(
+        providerId,
+        models.map((model) => ({
+          modelId: model.id,
+          config: codexModelConfigObject(model),
+        })),
+      );
     },
   };
 }

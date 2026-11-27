@@ -201,6 +201,10 @@ function Fixture() {
                   setProvider(createProvider(id));
                   setPicker(false);
                 }}
+                onCreateCodexSubscription={async () => {
+                  setPicker(false);
+                }}
+                codexSubscriptionSupported
               />
             ) : (
               <InlineEditableProviderCard

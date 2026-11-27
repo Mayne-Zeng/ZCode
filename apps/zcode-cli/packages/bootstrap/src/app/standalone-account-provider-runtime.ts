@@ -234,7 +234,12 @@ export function createStandaloneProviderRuntimeHeadersPort(
       input.abortSignal?.throwIfAborted();
       const providerId = input.providerId.trim();
       const access = input.accountAccess;
-      if (!access || access.mode !== "individual-coding-plan") {
+      if (!access) {
+        throw new Error(
+          `Provider 需要 Host 动态鉴权，独立 CLI 不可用；请使用 ZCode Desktop 或 tools/codex-subscription 网关: ${providerId}`,
+        );
+      }
+      if (access.mode !== "individual-coding-plan") {
         throw new Error(`Standalone Account Provider 请求身份无效: ${providerId}`);
       }
       const currentIdentity = (

@@ -255,7 +255,7 @@ export function ModelProviderSection({
   const { intl, locale } = useZCodeIntl();
   const confirmDialog = useConfirmDialog();
   const platform = usePlatform();
-  const { modelSelectionService, oauthService } = useServices();
+  const { modelSelectionService, oauthService, providerSettingsService } = useServices();
   const {
     modelProviders,
     providerTemplates,
@@ -319,6 +319,25 @@ export function ModelProviderSection({
   const [pendingCreatedProviderId, setPendingCreatedProviderId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [creatingProvider, setCreatingProvider] = useState(false);
+  // 远端 Host / 共享 Server 没有本机 OAuth 回调与凭据服务，不能提供 Codex 订阅登录。
+  const [codexSubscriptionSupported, setCodexSubscriptionSupported] = useState<boolean | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void providerSettingsService
+      .getCodexSubscriptionStatus()
+      .then((status) => {
+        if (!cancelled) setCodexSubscriptionSupported(status.supported);
+      })
+      .catch(() => {
+        if (!cancelled) setCodexSubscriptionSupported(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [providerSettingsService]);
 
   useEffect(() => {
     if (
@@ -1039,6 +1058,34 @@ export function ModelProviderSection({
     [createPersonalProvider, locale],
   );
 
+  const handleCreateCodexSubscriptionProvider = useCallback(async () => {
+    setCreatingProvider(true);
+    try {
+      const created = await createPersonalProvider({
+        providerName: intl.formatMessage({
+          id: "settings.modelProvider.codexSubscription.title",
+        }),
+        initialConfig: {
+          access: { type: "codex-oauth" },
+          api: {
+            type: "openai-responses",
+            baseUrl: "https://chatgpt.com/backend-api/codex",
+          },
+          personalModelIds: [],
+          modelOrder: [],
+        },
+      });
+      setPendingCreatedProviderId(created.providerId);
+      setSelectedNodeKey(createCustomProviderNodeKey(created.providerId));
+      setTemplatePickerOpen(false);
+    } catch (error) {
+      setPendingCreatedProviderId(null);
+      throw error;
+    } finally {
+      setCreatingProvider(false);
+    }
+  }, [createPersonalProvider, intl]);
+
   const marketingRequest = useStore(marketingNavigation, (state) => state.request);
   useEffect(() => {
     if (marketingRequest?.target.page !== "settings" || !marketingRequest.target.provider_id)
@@ -1183,6 +1230,8 @@ export function ModelProviderSection({
           onCreateCustom={(label) => {
             return handleCreateProvider({ providerName: label });
           }}
+          onCreateCodexSubscription={handleCreateCodexSubscriptionProvider}
+          codexSubscriptionSupported={codexSubscriptionSupported !== false}
         />
       ) : (
         <ModelProviderSectionDetail

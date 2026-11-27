@@ -25,6 +25,7 @@ import {
   ProviderModelsSection,
 } from "./ProviderCardSections.js";
 import { resolveModelProviderDisplayName } from "./constants.js";
+import { CodexSubscriptionSection } from "./CodexSubscriptionSection.js";
 import { useProviderDetailFeedback } from "./ProviderDetailFeedback.js";
 import { MODEL_PROVIDER_TEXT_IDLE_TRIGGER_MS, useIdleTrigger } from "./useIdleTrigger.js";
 import { useOptimisticReorder } from "./useOptimisticReorder.js";
@@ -747,6 +748,7 @@ export function InlineEditableProviderCard({
 
   const headerProviderName = providerDisplayName;
   const isAccountProvider = provider.config.access?.type === "zhipu-account";
+  const isCodexSubscription = provider.config.access?.type === "codex-oauth";
   const isApiKeyProvider = isApiKeyAccess(provider.config.access);
   const effectiveHeaderVisible = headerVisible && statusSection === undefined;
 
@@ -808,7 +810,9 @@ export function InlineEditableProviderCard({
       {statusSection}
 
       <div className="space-y-3">
-        {isAccountProvider ? null : (
+        {isCodexSubscription ? <CodexSubscriptionSection providerId={provider.providerId} /> : null}
+
+        {isAccountProvider || isCodexSubscription ? null : (
           <ProviderConnectionSection
             provider={provider}
             readOnly={readOnlyEndpoints}

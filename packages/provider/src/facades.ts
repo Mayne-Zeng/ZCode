@@ -98,6 +98,10 @@ export interface ProviderSettingsMutationTarget {
     enabled: boolean,
     membership?: ProviderModelMembership,
   ): Promise<unknown>;
+  replacePersonalModels(
+    providerId: ProviderId,
+    models: readonly { readonly modelId: ModelId; readonly config: ModelConfig }[],
+  ): Promise<unknown>;
   refresh(reason: string): Promise<ProviderRegistryServiceSnapshot>;
   /** 主动重读上游事实后再刷新 Registry。 */
   refreshSources?(reason: string): Promise<ProviderRegistryServiceSnapshot>;
@@ -368,6 +372,22 @@ export class ProviderSettingsFacade {
         parseModelConfig(config),
         this.#modelMembership(providerId),
         useRecommendedConfig,
+      ),
+    );
+  }
+
+  /** Codex 订阅模型同步：整组替换目标 Provider 的个人模型与手动规则。 */
+  replacePersonalModels(
+    providerId: ProviderId,
+    models: readonly { readonly modelId: ModelId; readonly config: ModelConfigObject }[],
+  ): Promise<ProviderSettingsView> {
+    return this.#mutateProvider(providerId, "replace-personal-models", (target) =>
+      target.replacePersonalModels(
+        providerId,
+        models.map((model) => ({
+          modelId: model.modelId,
+          config: parseModelConfig(model.config),
+        })),
       ),
     );
   }

@@ -528,6 +528,10 @@ import { AccountProviderApiClient } from "./model-provider/accountProviderApiCli
 import { createAccountProjectTokenClient } from "./model-provider/accountProjectTokenClient.js";
 import { AccountProviderApiKeyResolver } from "./model-provider/accountProviderApiKeyResolver.js";
 import { createProviderConfigRuntime } from "./model-provider/providerConfigRuntime.js";
+import {
+  createCodexSubscriptionService,
+  isAllowedCodexBaseUrl,
+} from "./model-provider/codexSubscriptionService.js";
 import { fetchZCodeBuiltinRemoteRelease } from "./model-provider/zcodeBuiltinRemoteConfig.js";
 import {
   createProviderRuntimeFromConfigRuntime,
@@ -1469,6 +1473,17 @@ export function createLocalServices(options: {
         caCertPath: settings.httpProxyCaCertPath,
       };
     });
+  // Codex 订阅凭据只进本机 Desktop Host 的凭据服务；远端 attachment 与共享 Server
+  // 无法替用户完成本机浏览器登录，也不能把 token 留在服务端，因此不装配该能力。
+  // 网络必须复用 Host 的代理/No Proxy/自定义 CA 选路：globalThis.fetch 不读系统代理，
+  // 会绕过用户在设置页配置的出口而触发上游地区/网络限制。
+  const codexSubscriptionService =
+    options?.serviceAuthorityMode === "desktop-local"
+      ? createCodexSubscriptionService({
+          credentialService,
+          fetchImpl: hostApiNetworkTransport.fetch,
+        })
+      : undefined;
   const zcodeJwtLogoutHandlerRef: {
     current: ((input: string | URL, headers: Headers) => void) | null;
   } = { current: null };
@@ -1773,6 +1788,7 @@ export function createLocalServices(options: {
     modelSelectionConfiguredDefaultSource,
     disposeModelSelectionConfiguredDefaultSource: () =>
       modelSelectionConfiguredDefaultSource.dispose(),
+    codexSubscription: codexSubscriptionService,
     testConnectivity: createProviderSettingsConnectivityTester({
       testModelConnectivity: async (input) => {
         if (!providerConnectivityAgentService) {
@@ -2452,6 +2468,28 @@ export function createLocalServices(options: {
       ? { accountProviderConfigSource: agentAccountProviderConfigSource }
       : {}),
     accountRequestAuthService,
+    // Codex 订阅没有 accountAccess 载荷：Host 必须按 providerId 回查当前 Registry 配置，
+    // 且只对固定 ChatGPT Codex 端点下发 token，避免个人 Provider 改 baseUrl 后外带凭据。
+    ...(codexSubscriptionService
+      ? {
+          resolveProviderRequestAuth: async ({ providerId }: { providerId: string }) => {
+            const config = await providerRuntime.configService.read();
+            const provider =
+              config.personalProviders.get(providerId) ??
+              config.zcodeBuiltinProviders.get(providerId);
+            if (provider?.access?.type !== "codex-oauth") return undefined;
+            if (provider.api?.type !== "openai-responses") {
+              throw new Error(`Codex 订阅 Provider 必须使用 openai-responses: ${providerId}`);
+            }
+            if (!isAllowedCodexBaseUrl(provider.api?.baseUrl ?? undefined)) {
+              throw new Error(
+                `Codex 订阅 Provider 的 Base URL 不被允许: ${providerId}；必须是 https://chatgpt.com/backend-api/codex`,
+              );
+            }
+            return codexSubscriptionService.resolveRequestAuth();
+          },
+        }
+      : {}),
     readRequestVerificationConfig: () =>
       codingPlanSubscriptionService.getRequestVerificationConfig(),
     ...(modelSelectionReadinessSource ? { modelSelectionReadinessSource } : {}),

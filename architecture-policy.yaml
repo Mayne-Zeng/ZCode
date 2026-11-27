@@ -2624,3 +2624,24 @@ exceptions:
     paths:
       - apps/zcode-cli/packages/cli/src/browser-state-option.ts
     reason: --browser-state 与 --no-browser-state 的参数校验与来源解析（docs/browser-use/2026-11-17-cli-browser-state-spec.md §4），只被已有 unmanaged 的 CLI 入口 run.ts 调用。不新增模块边界或状态 owner；接管整个 zcode-cli 不在本次范围内。
+  - id: codex-subscription-provider-access-schema
+    rule: unmanaged-new-file
+    paths:
+      - packages/provider/src/config/provider-data-schema.ts
+    reason: Codex 订阅原生接入（docs/specs/codex-subscription-native-integration.md）只在既有 Provider Access 联合类型增加 codex-oauth 分支与固定端点校验；不改变 Provider 配置 owner、依赖方向或模块边界，接管整个 provider 未受管模块不在本次范围内。
+  - id: codex-subscription-host-service
+    rule: unmanaged-new-file
+    paths:
+      - packages/services/src/model-provider/codexSubscriptionService.ts
+      - packages/services/src/model-provider/codexSubscriptionTypes.ts
+    reason: ChatGPT 订阅登录与令牌刷新由 Local Host 凭据服务持有（docs/specs/codex-subscription-native-integration.md §3），只被已有 unmanaged 的 node.ts 与 provider facade 装配调用；token 不下发 Renderer，不新增协议频道或第二份状态 owner，接管整个 services 未受管模块不在本次范围内。
+  - id: codex-subscription-settings-ui
+    rule: unmanaged-new-file
+    paths:
+      - packages/ui/src/settings/model-provider-section/CodexSubscriptionSection.tsx
+    reason: 设置页只展示 Host 登录状态并发起登录/同步动作（docs/specs/codex-subscription-native-integration.md §4.3），通过既有 IProviderSettingsService 访问服务；不直接持有 token 或 Provider 配置，接管整个 ui 未受管模块不在本次范围内。
+  - id: codex-subscription-cli-wire-fetch
+    rule: unmanaged-new-file
+    paths:
+      - apps/zcode-cli/packages/adapters/src/model/codex-oauth-fetch.ts
+    reason: Codex 后端固定无状态流式，且非流式辅助调用需要把 SSE 聚合回 JSON（docs/specs/codex-subscription-native-integration.md §4.4）；该 fetch 只被已有 unmanaged 的 model-execution 在 codex-oauth 分支装配，不新增凭据来源或模块边界，接管整个 zcode-cli 不在本次范围内。

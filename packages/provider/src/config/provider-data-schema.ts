@@ -54,13 +54,24 @@ export const zhipuAccountAccessDataSchema = z
     type: completeZhipuAccountAccessDataSchema.shape.type,
   })
   .strict();
+export const codexOAuthAccessDataSchema = z
+  .object({
+    // Token 只属于 Host 凭据服务；Provider Config 只声明接入方式，不携带任何秘密。
+    type: z.literal("codex-oauth"),
+  })
+  .strict();
+export const completeCodexOAuthAccessDataSchema = codexOAuthAccessDataSchema;
+
 export const providerAccessDataSchema = z.discriminatedUnion("type", [
   apiKeyAccessDataSchema,
   zhipuAccountAccessDataSchema,
+  codexOAuthAccessDataSchema,
 ]);
+
 export const completeProviderAccessDataSchema = z.discriminatedUnion("type", [
   completeApiKeyAccessDataSchema,
   completeZhipuAccountAccessDataSchema,
+  completeCodexOAuthAccessDataSchema,
 ]);
 
 export const completeProviderApiDataSchema = z

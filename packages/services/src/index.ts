@@ -4,11 +4,21 @@ export { ServiceCollection, type ServiceExposurePolicy } from "./collection.js";
 export {
   IModelSelectionService,
   IProviderSettingsService,
+  type CodexSubscriptionSettingsPort,
   type ModelSelectionView,
   type ModelSelectionViewInput,
   type ProviderSettingsProviderView,
   type ProviderSettingsView,
 } from "./model-provider/providerFacadeServices.js";
+export {
+  CodexSubscriptionError,
+  CodexSubscriptionLoginRequiredError,
+  isAllowedCodexBaseUrl,
+  type CodexSubscriptionLoginState,
+  type CodexSubscriptionModel,
+  type CodexSubscriptionRequestAuth,
+  type CodexSubscriptionStatus,
+} from "./model-provider/codexSubscriptionTypes.js";
 export {
   createAccountRequestAuthService,
   type IAccountRequestAuthService,

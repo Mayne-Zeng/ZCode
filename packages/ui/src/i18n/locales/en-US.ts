@@ -4583,6 +4583,20 @@ const enUS: Record<string, string> = {
     "Manage custom model providers. Once configured, they can be selected during chat.",
   "settings.modelProvider.add": "Add provider",
   "settings.modelProvider.createCustomProvider": "Create custom provider",
+  "settings.modelProvider.codexSubscription.title": "Codex subscription",
+  "settings.modelProvider.codexSubscription.create": "Use a ChatGPT subscription",
+  "settings.modelProvider.codexSubscription.signedOut": "Not signed in to ChatGPT",
+  "settings.modelProvider.codexSubscription.login": "Sign in to ChatGPT",
+  "settings.modelProvider.codexSubscription.pending": "Waiting for the browser to finish sign-in…",
+  "settings.modelProvider.codexSubscription.cancel": "Cancel",
+  "settings.modelProvider.codexSubscription.signedInAs": "Signed in as {account}",
+  "settings.modelProvider.codexSubscription.expiresAt": "Token refresh due {date}",
+  "settings.modelProvider.codexSubscription.expiredAt":
+    "Token expired; the next request will try to refresh ({date})",
+  "settings.modelProvider.codexSubscription.syncModels": "Sync models",
+  "settings.modelProvider.codexSubscription.logout": "Sign out",
+  "settings.modelProvider.codexSubscription.synced":
+    "Models synced. They are listed below and can be selected in chat.",
   "settings.modelProvider.templateCreateFailed":
     "Failed to create provider: invalid personal provider configuration",
   "settings.modelProvider.templateCreateRetry": "Retry",

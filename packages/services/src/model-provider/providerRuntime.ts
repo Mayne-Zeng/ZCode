@@ -21,6 +21,7 @@ import {
   createProviderSettingsService,
   type IModelSelectionService,
   type IProviderSettingsService,
+  type CodexSubscriptionSettingsPort,
   type ModelSelectionConfiguredDefaultSource,
   type ProviderSettingsConnectivityTester,
 } from "./providerFacadeServices.js";
@@ -31,6 +32,7 @@ const log = createServiceLogger("provider-runtime");
 export interface ProviderRuntimeOptions extends ProviderConfigRuntimeOptions {
   readonly accountSource?: RefreshableProviderSource<AccountProviderConfigSnapshot>;
   readonly testConnectivity?: ProviderSettingsConnectivityTester;
+  readonly codexSubscription?: CodexSubscriptionSettingsPort;
 }
 
 export interface ProviderRuntimeDependencies {
@@ -38,6 +40,7 @@ export interface ProviderRuntimeDependencies {
   readonly accountSource?: RefreshableProviderSource<AccountProviderConfigSnapshot>;
   readonly disposeAccountSource?: () => void;
   readonly testConnectivity?: ProviderSettingsConnectivityTester;
+  readonly codexSubscription?: CodexSubscriptionSettingsPort;
   readonly modelSelectionConfiguredDefaultSource?: ModelSelectionConfiguredDefaultSource;
   readonly disposeModelSelectionConfiguredDefaultSource?: () => void;
 }
@@ -69,6 +72,7 @@ export class ProviderRuntime {
   readonly providerSettings: IProviderSettingsService;
   readonly modelSelection: IModelSelectionService;
   readonly #configRuntime: ProviderConfigRuntime;
+  readonly #codexSubscription?: CodexSubscriptionSettingsPort;
   readonly #disposeAccountSource?: () => void;
   readonly #disposeBuiltinRecovery: () => void;
   readonly #modelSelectionRuntime: IModelSelectionService & { dispose(): void };
@@ -78,6 +82,7 @@ export class ProviderRuntime {
 
   constructor(dependencies: ProviderRuntimeDependencies) {
     this.#configRuntime = dependencies.configRuntime;
+    this.#codexSubscription = dependencies.codexSubscription;
     this.#disposeAccountSource = dependencies.disposeAccountSource;
     this.#disposeModelSelectionConfiguredDefaultSource =
       dependencies.disposeModelSelectionConfiguredDefaultSource;
@@ -108,6 +113,7 @@ export class ProviderRuntime {
       settingsFacade,
       ensureReady,
       dependencies.testConnectivity,
+      dependencies.codexSubscription,
     );
     this.#modelSelectionRuntime = createModelSelectionService(
       createNodeModelSelectionFacade(this.registryService),
@@ -136,6 +142,7 @@ export class ProviderRuntime {
     this.registryService.dispose();
     this.#disposeAccountSource?.();
     this.#disposeModelSelectionConfiguredDefaultSource?.();
+    void this.#codexSubscription?.dispose?.();
     this.#configRuntime.dispose();
   }
 }
@@ -162,6 +169,8 @@ function createSettingsMutationTarget(
       configService.deletePersonalModel(providerId, modelId, membership),
     setPersonalModelEnabled: (providerId, modelId, enabled, membership) =>
       configService.setPersonalModelEnabled(providerId, modelId, enabled, membership),
+    replacePersonalModels: (providerId, models) =>
+      configService.replacePersonalModels(providerId, models),
     savePersonalModelDraft: (
       providerId,
       originalModelId,
@@ -202,7 +211,7 @@ function createSettingsMutationTarget(
 }
 
 export function createProviderRuntime(options: ProviderRuntimeOptions): ProviderRuntime {
-  const { accountSource, testConnectivity, ...configRuntimeOptions } = options;
+  const { accountSource, testConnectivity, codexSubscription, ...configRuntimeOptions } = options;
   const configRuntime = createProviderConfigRuntime(configRuntimeOptions);
   const modelSelectionConfiguredDefaultSource = new NodeModelSelectionConfigRepository({
     personalRepository: configRuntime.personalRepository,
@@ -211,6 +220,7 @@ export function createProviderRuntime(options: ProviderRuntimeOptions): Provider
     configRuntime,
     accountSource,
     testConnectivity,
+    codexSubscription,
     modelSelectionConfiguredDefaultSource,
     disposeModelSelectionConfiguredDefaultSource: () =>
       modelSelectionConfiguredDefaultSource.dispose(),
