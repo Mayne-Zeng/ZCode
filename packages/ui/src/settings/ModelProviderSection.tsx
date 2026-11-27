@@ -296,6 +296,14 @@ export function ModelProviderSection({
         .map((provider) => provider.providerId),
     );
   }, [providerSettingsView]);
+  // 凭据是全局单账号；已有 Codex Provider 时不再重复创建，避免多张卡片状态分叉。
+  const hasCodexSubscriptionProvider = useMemo(
+    () =>
+      (providerSettingsView?.providers ?? []).some(
+        (provider) => provider.effectiveConfig.access?.type === "codex-oauth",
+      ),
+    [providerSettingsView],
+  );
   const providerConnectionRefreshSignal = providerSettingsView?.revision;
   const [initialModelProviderTarget] = useState(() => consumePendingSettingsModelProviderTarget());
   const [invalidProviderTarget, setInvalidProviderTarget] = useState(() =>
@@ -1231,7 +1239,9 @@ export function ModelProviderSection({
             return handleCreateProvider({ providerName: label });
           }}
           onCreateCodexSubscription={handleCreateCodexSubscriptionProvider}
-          codexSubscriptionSupported={codexSubscriptionSupported !== false}
+          codexSubscriptionSupported={
+            codexSubscriptionSupported !== false && !hasCodexSubscriptionProvider
+          }
         />
       ) : (
         <ModelProviderSectionDetail

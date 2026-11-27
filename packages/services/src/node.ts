@@ -2470,26 +2470,26 @@ export function createLocalServices(options: {
     accountRequestAuthService,
     // Codex 订阅没有 accountAccess 载荷：Host 必须按 providerId 回查当前 Registry 配置，
     // 且只对固定 ChatGPT Codex 端点下发 token，避免个人 Provider 改 baseUrl 后外带凭据。
-    ...(codexSubscriptionService
-      ? {
-          resolveProviderRequestAuth: async ({ providerId }: { providerId: string }) => {
-            const config = await providerRuntime.configService.read();
-            const provider =
-              config.personalProviders.get(providerId) ??
-              config.zcodeBuiltinProviders.get(providerId);
-            if (provider?.access?.type !== "codex-oauth") return undefined;
-            if (provider.api?.type !== "openai-responses") {
-              throw new Error(`Codex 订阅 Provider 必须使用 openai-responses: ${providerId}`);
-            }
-            if (!isAllowedCodexBaseUrl(provider.api?.baseUrl ?? undefined)) {
-              throw new Error(
-                `Codex 订阅 Provider 的 Base URL 不被允许: ${providerId}；必须是 https://chatgpt.com/backend-api/codex`,
-              );
-            }
-            return codexSubscriptionService.resolveRequestAuth();
-          },
-        }
-      : {}),
+    // 非 desktop-local Host 没有 Codex 凭据服务；仍要回查配置，把 codex Provider 的失败
+    // 变成明确的「需要 Desktop 本机 Host」，而不是泛化的 request auth 不可用。
+    resolveProviderRequestAuth: async ({ providerId }: { providerId: string }) => {
+      const config = await providerRuntime.configService.read();
+      const provider =
+        config.personalProviders.get(providerId) ?? config.zcodeBuiltinProviders.get(providerId);
+      if (provider?.access?.type !== "codex-oauth") return undefined;
+      if (!codexSubscriptionService) {
+        throw new Error("Codex 订阅需要 Desktop 本机 Host；当前 Host 不提供该能力");
+      }
+      if (provider.api?.type !== "openai-responses") {
+        throw new Error(`Codex 订阅 Provider 必须使用 openai-responses: ${providerId}`);
+      }
+      if (!isAllowedCodexBaseUrl(provider.api?.baseUrl ?? undefined)) {
+        throw new Error(
+          `Codex 订阅 Provider 的 Base URL 不被允许: ${providerId}；必须是 https://chatgpt.com/backend-api/codex`,
+        );
+      }
+      return codexSubscriptionService.resolveRequestAuth();
+    },
     readRequestVerificationConfig: () =>
       codingPlanSubscriptionService.getRequestVerificationConfig(),
     ...(modelSelectionReadinessSource ? { modelSelectionReadinessSource } : {}),

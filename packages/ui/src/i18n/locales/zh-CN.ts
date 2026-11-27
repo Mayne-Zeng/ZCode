@@ -4284,6 +4284,12 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.codexSubscription.syncModels": "同步模型",
   "settings.modelProvider.codexSubscription.logout": "退出登录",
   "settings.modelProvider.codexSubscription.synced": "模型已同步，可在下方列表查看。",
+  "settings.modelProvider.codexSubscription.desktopOnly":
+    "登录需要在桌面端完成；手机或网页收不到本机的 1455 OAuth 回调。",
+  "settings.modelProvider.codexSubscription.syncOverwrites":
+    "同步模型会覆盖当前模型的上下文窗口、推理档位和启用状态。",
+  "settings.modelProvider.codexSubscription.autoSyncSkipped":
+    "已有模型配置，已跳过自动同步；需要更新时请手动同步。",
   "settings.modelProvider.templateCreateFailed": "创建供应商失败：个人供应商配置格式无效",
   "settings.modelProvider.templateCreateRetry": "重试",
   "settings.modelProvider.edit": "编辑",

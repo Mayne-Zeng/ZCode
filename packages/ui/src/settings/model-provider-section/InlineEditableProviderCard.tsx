@@ -810,7 +810,12 @@ export function InlineEditableProviderCard({
       {statusSection}
 
       <div className="space-y-3">
-        {isCodexSubscription ? <CodexSubscriptionSection providerId={provider.providerId} /> : null}
+        {isCodexSubscription ? (
+          <CodexSubscriptionSection
+            providerId={provider.providerId}
+            hasConfiguredModels={provider.models.length > 0}
+          />
+        ) : null}
 
         {isAccountProvider || isCodexSubscription ? null : (
           <ProviderConnectionSection

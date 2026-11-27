@@ -41,6 +41,8 @@ export interface CodexSubscriptionServiceOptions {
   readonly credentialService: Pick<ICredentialService, "load" | "save" | "delete">;
   readonly fetchImpl?: typeof globalThis.fetch;
   readonly now?: () => number;
+  /** 仅测试用：回调监听端口可换；OAuth redirect_uri 仍固定 1455。 */
+  readonly callbackPort?: number;
 }
 
 export interface CodexSubscriptionService {
@@ -182,7 +184,7 @@ export function normalizeCodexModels(raw: unknown): CodexSubscriptionModel[] {
     if (efforts.length === 0 && advertisedEfforts.includes("ultra")) efforts.push("max");
     const inputs = Array.isArray(item.input_modalities)
       ? item.input_modalities.filter((value): value is string => typeof value === "string")
-      : ["text", "image"];
+      : ["text"];
     const contextWindow =
       positiveInteger(item.context_window) ?? positiveInteger(item.max_context_window);
     const maxOutputTokens = positiveInteger(item.max_output_tokens);
@@ -233,10 +235,16 @@ export function createCodexSubscriptionService(
 ): CodexSubscriptionService {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const now = options.now ?? Date.now;
+  const callbackPort = options.callbackPort ?? 1455;
   let pending: PendingLogin | null = null;
   let lastError: string | null = null;
+  // 登录阶段跨越 callback 与 token 交换，getStatus 在两个阶段都必须保持 pending；
+  // 否则 UI 会在回调已到、凭据未写时停止轮询，自动同步也永远不会触发。
+  let loginPhase: "idle" | "waiting" | "exchanging" = "idle";
   // 登录换代令牌：新登录、取消或退出后，迟到的 token 交换不能再覆盖当前凭据。
   let loginGeneration = 0;
+  // 凭据换代令牌：logout/新登录/刷新写回都要让更早的在途刷新失效，避免退出后被复活。
+  let credentialGeneration = 0;
   let refreshInFlight: Promise<StoredCodexAuth> | null = null;
   let disposed = false;
 
@@ -248,6 +256,7 @@ export function createCodexSubscriptionService(
 
   async function writeStored(auth: StoredCodexAuth): Promise<StoredCodexAuth> {
     await options.credentialService.save(CREDENTIAL_KEY, JSON.stringify(auth));
+    credentialGeneration += 1;
     return auth;
   }
 
@@ -331,21 +340,42 @@ export function createCodexSubscriptionService(
   }
 
   async function refresh(auth: StoredCodexAuth): Promise<StoredCodexAuth> {
-    const tokens = await postToken(
-      new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: auth.refresh,
-        client_id: CLIENT_ID,
-      }),
-    );
-    return writeStored({
+    const generation = credentialGeneration;
+    let tokens: Awaited<ReturnType<typeof postToken>>;
+    try {
+      tokens = await postToken(
+        new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: auth.refresh,
+          client_id: CLIENT_ID,
+        }),
+      );
+    } catch (error) {
+      // refresh token 被撤销/过期时不能只给通用 400，让用户知道需要重新登录。
+      if (
+        error instanceof CodexSubscriptionError &&
+        /invalid_grant|invalid_token|token_expired/iu.test(error.message)
+      ) {
+        throw new CodexSubscriptionLoginRequiredError("ChatGPT 登录已失效，请重新登录");
+      }
+      throw error;
+    }
+    const next = {
       access: tokens.access,
       refresh: tokens.refresh,
       expires: tokens.expires,
       accountId: decodeCodexAccountId(tokens.access),
       email: auth.email ?? tokens.email,
       updatedAt: now(),
-    });
+    } satisfies StoredCodexAuth;
+    // 网络期间可能发生 logout 或另一次登录；只有仍是发起刷新时的那份凭据才写回。
+    const current = await readStored();
+    if (!current) throw new CodexSubscriptionLoginRequiredError();
+    if (generation !== credentialGeneration || current.refresh !== auth.refresh) {
+      if (current.expires - REFRESH_SKEW_MS > now()) return current;
+      throw new CodexSubscriptionLoginRequiredError("登录状态已变化，请重新登录");
+    }
+    return writeStored(next);
   }
 
   async function resolveStored(forceRefresh = false): Promise<StoredCodexAuth> {
@@ -368,7 +398,8 @@ export function createCodexSubscriptionService(
   }
 
   async function getStatus(): Promise<CodexSubscriptionStatus> {
-    if (pending) return { supported: true, state: "pending" };
+    // callback 已到、token 交换尚未完成时仍属 pending；不能提前落到 signed-out。
+    if (loginPhase !== "idle") return { supported: true, state: "pending" };
     try {
       const auth = await readStored();
       if (auth) {
@@ -398,6 +429,7 @@ export function createCodexSubscriptionService(
     if (disposed) throw new CodexSubscriptionError("Codex 订阅服务已释放");
     closePending();
     lastError = null;
+    loginPhase = "waiting";
     const generation = ++loginGeneration;
     const state = randomBytes(16).toString("hex");
     const { verifier, challenge } = createPkcePair();
@@ -428,6 +460,7 @@ export function createCodexSubscriptionService(
             error === "unsupported_country_region_territory"
               ? "ChatGPT 登录被地区限制：请把浏览器代理切到支持的地区（如美国/日本/新加坡）后重试。"
               : `ChatGPT 登录被拒绝: ${error}`;
+          loginPhase = "idle";
           closePending();
         }
         log.warn(undefined, "Codex 订阅 OAuth 回调返回错误", {
@@ -439,10 +472,8 @@ export function createCodexSubscriptionService(
         return;
       }
       if (returnedState !== state) {
-        if (isCurrent()) {
-          lastError = "OAuth state 校验失败，请重新登录";
-          closePending();
-        }
+        // 错 state 可能来自旧标签或本机探测；只拒绝这次回调，不能取消仍在等待的合法登录。
+        log.warn(undefined, "Codex 订阅 OAuth state 不匹配", { stale: !isCurrent() });
         respondHtml(response, 400, "state 校验失败或登录已过期，请回到 ZCode 重新登录。");
         return;
       }
@@ -455,11 +486,13 @@ export function createCodexSubscriptionService(
         return;
       }
       respondHtml(response, 200, "登录完成，可以关闭此页面并回到 ZCode。");
+      loginPhase = "exchanging";
       closePending();
       void exchangeCode(code, verifier)
         .then(async (auth) => {
           if (generation !== loginGeneration) return;
           await writeStored(auth);
+          loginPhase = "idle";
           // 只记录套餐类型，不记录 token/account id；用于区分 Codex OAuth token 与
           // 普通 ChatGPT 网页会话 token。
           log.info(undefined, "Codex 订阅登录完成", {
@@ -469,6 +502,7 @@ export function createCodexSubscriptionService(
         .catch((error: unknown) => {
           if (generation !== loginGeneration) return;
           lastError = error instanceof Error ? error.message : String(error);
+          loginPhase = "idle";
           log.warn(undefined, "Codex 订阅 token 交换失败", { error: lastError });
         });
     });
@@ -478,7 +512,7 @@ export function createCodexSubscriptionService(
         reject(
           new CodexSubscriptionError(
             error.code === "EADDRINUSE"
-              ? "本地 OAuth 回调端口 1455 被占用；请先关闭 Codex CLI 或其它登录中的终端后重试"
+              ? `本地 OAuth 回调端口 ${callbackPort} 被占用；请先关闭 Codex CLI、其它登录中的终端或 codex-sub 网关后重试`
               : `启动 ChatGPT 登录回调失败: ${error.message}`,
             { cause: error },
           ),
@@ -490,13 +524,15 @@ export function createCodexSubscriptionService(
       };
       server.once("error", onError);
       server.once("listening", onListening);
-      server.listen(1455, "127.0.0.1");
+      server.listen(callbackPort, "127.0.0.1");
     }).catch((error: unknown) => {
+      loginPhase = "idle";
       lastError = error instanceof Error ? error.message : String(error);
       throw error;
     });
     const timer = setTimeout(() => {
       lastError = "ChatGPT 登录超时，请重新发起登录";
+      loginPhase = "idle";
       closePending();
     }, LOGIN_TIMEOUT_MS);
     timer.unref?.();
@@ -506,14 +542,19 @@ export function createCodexSubscriptionService(
   }
 
   async function cancelLogin(): Promise<void> {
-    if (!pending) return;
+    // token 交换在途时 pending 已清空，但取消仍必须作废这次 exchange。
+    if (!pending && loginPhase !== "exchanging") return;
     loginGeneration += 1;
+    loginPhase = "idle";
     lastError = null;
     closePending();
   }
 
   async function logout(): Promise<void> {
     loginGeneration += 1;
+    // 先推进凭据代次再删除；在途 refresh 即使拿到响应也不能把旧 token 写回。
+    credentialGeneration += 1;
+    loginPhase = "idle";
     closePending();
     lastError = null;
     await options.credentialService.delete(CREDENTIAL_KEY);
@@ -567,6 +608,8 @@ export function createCodexSubscriptionService(
   async function dispose(): Promise<void> {
     disposed = true;
     loginGeneration += 1;
+    credentialGeneration += 1;
+    loginPhase = "idle";
     closePending();
   }
 

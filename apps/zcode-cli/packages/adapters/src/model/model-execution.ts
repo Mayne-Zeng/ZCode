@@ -26,7 +26,7 @@ import { createAnthropicCompatFetch } from "./anthropic-stream-compat.js";
 import { createModelRequestSecurityState } from "./request-security-edition/index.js";
 import type { ModelRequestSecurityState, ModelRequestSecurityPort } from "./request-security.js";
 import { createOpenAIResponsesJsonCompatFetch } from "./openai-responses-json-compat.js";
-import { createCodexOAuthFetch } from "./codex-oauth-fetch.js";
+import { createCodexOAuthFetch, isCodexEndpointUrl } from "./codex-oauth-fetch.js";
 import { createModelOptionMapFetch, type RawRequestBodyCapture } from "./model-option-map-fetch.js";
 import { createNetworkProxyFetch } from "../network/proxy-fetch.js";
 import { createProviderEndpointRoutingFetch } from "./provider-endpoint-routing-fetch.js";
@@ -466,6 +466,16 @@ function applyModelRequestAuth(
   requestAuth: ModelRequestAuth | undefined,
 ): AiSdkProviderConfig {
   if (!requestAuth) return providerConfig;
+  // Host 是 token 签发的权威；CLI 侧再断言一次实际请求目标，避免 Host 与 CLI 两份
+  // 配置在模型创建/请求之间分叉时把订阅 token 发往旧端点。
+  if (
+    providerConfig.access.type === "codex-oauth" &&
+    !isCodexEndpointUrl(providerConfig.baseURL)
+  ) {
+    throw new Error(
+      "Codex 订阅 Provider 的 Base URL 必须是 https://chatgpt.com/backend-api/codex",
+    );
+  }
   const staticHeaders = withoutRequestVerificationHeaders(providerConfig.headers);
   // 账号动态身份头必须先清理静态认证头，避免 SDK 优先使用旧凭据。
   const runtimeAuth =

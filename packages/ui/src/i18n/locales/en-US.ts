@@ -4597,6 +4597,12 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.codexSubscription.logout": "Sign out",
   "settings.modelProvider.codexSubscription.synced":
     "Models synced. They are listed below and can be selected in chat.",
+  "settings.modelProvider.codexSubscription.desktopOnly":
+    "Sign-in must be completed in the desktop app; phones and web cannot receive the local 1455 OAuth callback.",
+  "settings.modelProvider.codexSubscription.syncOverwrites":
+    "Syncing models overwrites the current context windows, reasoning levels, and enabled states.",
+  "settings.modelProvider.codexSubscription.autoSyncSkipped":
+    "Existing model configuration was kept; use Sync models manually to update it.",
   "settings.modelProvider.templateCreateFailed":
     "Failed to create provider: invalid personal provider configuration",
   "settings.modelProvider.templateCreateRetry": "Retry",

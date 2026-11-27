@@ -9,6 +9,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+/** Provider baseURL 必须严格指向 Codex 端点；端口/query/userinfo 都不允许。 */
+export function isCodexEndpointUrl(value: string | null | undefined): boolean {
+  if (typeof value !== "string" || value.trim().length === 0) return false;
+  try {
+    const url = new URL(value.trim());
+    return (
+      url.protocol === "https:" &&
+      url.host === CODEX_RESPONSES_HOST &&
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === "" &&
+      url.pathname.replace(/\/+$/u, "") === "/backend-api/codex"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isCodexResponsesRequest(input: RequestInfo | URL): boolean {
   const raw =
     typeof input === "string" ? input : input instanceof URL ? input.href : (input.url ?? "");
@@ -121,13 +140,17 @@ export function createCodexOAuthFetch(fetchImpl: FetchLike): FetchLike {
     if (!isRecord(body)) return fetchImpl(input, init);
     const wantsStream = body.stream === true;
     const normalized = normalizeBody(body);
+    // Request 输入路径必须继承原 Request 的 headers（尤其是 Authorization）；
+    // 只传 init.headers 会用空 Headers 覆盖掉它们。
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    for (const [name, value] of new Headers(init?.headers).entries()) headers.set(name, value);
     const requestInit: RequestInit = {
       ...init,
       body: JSON.stringify(normalized),
-      headers: new Headers(init?.headers),
+      headers,
     };
-    (requestInit.headers as Headers).set("content-type", "application/json");
-    (requestInit.headers as Headers).set("accept", "text/event-stream");
+    headers.set("content-type", "application/json");
+    headers.set("accept", "text/event-stream");
     const response = await fetchImpl(
       input instanceof Request ? new Request(input, requestInit) : input,
       input instanceof Request ? undefined : requestInit,

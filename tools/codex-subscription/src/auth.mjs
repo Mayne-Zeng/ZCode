@@ -441,7 +441,7 @@ export function normalizeModelCatalog(raw) {
     if (efforts.length === 0 && advertisedEfforts.includes("ultra")) efforts.push("max");
     const inputs = Array.isArray(item.input_modalities)
       ? item.input_modalities.filter((value) => typeof value === "string")
-      : ["text", "image"];
+      : ["text"];
     const contextWindow =
       positiveInteger(item.context_window) ?? positiveInteger(item.max_context_window);
     const maxOutputTokens = positiveInteger(item.max_output_tokens);

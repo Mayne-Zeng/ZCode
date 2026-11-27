@@ -27,7 +27,14 @@ function errorMessage(error: unknown): string {
  * Codex 订阅 Provider 的 Host 登录状态。token 始终留在 Host 凭据服务，
  * 这里只展示状态并发起登录/同步动作。
  */
-export function CodexSubscriptionSection({ providerId }: { providerId: string }) {
+export function CodexSubscriptionSection({
+  providerId,
+  hasConfiguredModels = false,
+}: {
+  providerId: string;
+  /** 已有模型时登录后不自动同步，避免无提示覆盖用户手改的模型配置。 */
+  hasConfiguredModels?: boolean;
+}) {
   const { providerSettingsService } = useServices();
   const platform = usePlatform();
   const { intl, locale } = useZCodeIntl();
@@ -35,9 +42,12 @@ export function CodexSubscriptionSection({ providerId }: { providerId: string })
   const [busy, setBusy] = useState<"login" | "logout" | "sync" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
+  const [autoSyncSkipped, setAutoSyncSkipped] = useState(false);
   const mountedRef = useRef(true);
   // 只在本次登录成功后自动同步一次；页面重新挂载不覆盖用户已有的模型编辑。
   const autoSyncRef = useRef(false);
+  // Web/手机无法接收本机 1455 回调；登录只能在桌面客户端完成。
+  const canLoginHere = platform.canOpenLocalFiles !== false;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -70,6 +80,12 @@ export function CodexSubscriptionSection({ providerId }: { providerId: string })
   }, [refreshStatus, status?.state]);
 
   const handleLogin = useCallback(async () => {
+    if (!canLoginHere) {
+      setActionError(
+        intl.formatMessage({ id: "settings.modelProvider.codexSubscription.desktopOnly" }),
+      );
+      return;
+    }
     setBusy("login");
     setActionError(null);
     try {
@@ -83,7 +99,7 @@ export function CodexSubscriptionSection({ providerId }: { providerId: string })
     } finally {
       if (mountedRef.current) setBusy(null);
     }
-  }, [platform, providerSettingsService]);
+  }, [canLoginHere, intl, platform, providerSettingsService]);
 
   const handleCancelLogin = useCallback(async () => {
     setBusy("login");
@@ -128,8 +144,13 @@ export function CodexSubscriptionSection({ providerId }: { providerId: string })
   useEffect(() => {
     if (status?.state !== "signed-in" || !autoSyncRef.current) return;
     autoSyncRef.current = false;
+    if (hasConfiguredModels) {
+      // 登录后的自动同步只在空模型列表上执行；已有配置保留，用户可手动同步。
+      setAutoSyncSkipped(true);
+      return;
+    }
     void handleSyncModels();
-  }, [handleSyncModels, status?.state]);
+  }, [handleSyncModels, hasConfiguredModels, status?.state]);
 
   if (!status?.supported) return null;
 
@@ -203,7 +224,7 @@ export function CodexSubscriptionSection({ providerId }: { providerId: string })
                 {intl.formatMessage({ id: "settings.modelProvider.codexSubscription.logout" })}
               </Button>
             </>
-          ) : (
+          ) : canLoginHere ? (
             <Button
               type="button"
               size="sm"
@@ -212,6 +233,10 @@ export function CodexSubscriptionSection({ providerId }: { providerId: string })
             >
               {intl.formatMessage({ id: "settings.modelProvider.codexSubscription.login" })}
             </Button>
+          ) : (
+            <span className="max-w-64 text-ui-base text-foreground-subtle">
+              {intl.formatMessage({ id: "settings.modelProvider.codexSubscription.desktopOnly" })}
+            </span>
           )}
         </div>
       </div>
@@ -223,6 +248,16 @@ export function CodexSubscriptionSection({ providerId }: { providerId: string })
       {actionError ? (
         <p role="alert" className="text-ui-base text-destructive">
           {actionError}
+        </p>
+      ) : null}
+      {hasConfiguredModels ? (
+        <p className="text-ui-base text-foreground-subtle">
+          {intl.formatMessage({ id: "settings.modelProvider.codexSubscription.syncOverwrites" })}
+        </p>
+      ) : null}
+      {autoSyncSkipped ? (
+        <p className="text-ui-base text-foreground-subtle">
+          {intl.formatMessage({ id: "settings.modelProvider.codexSubscription.autoSyncSkipped" })}
         </p>
       ) : null}
       {syncedAt ? (

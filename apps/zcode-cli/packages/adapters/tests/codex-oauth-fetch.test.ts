@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createCodexOAuthFetch } from "../src/model/codex-oauth-fetch.js";
+import { createCodexOAuthFetch, isCodexEndpointUrl } from "../src/model/codex-oauth-fetch.js";
 
 const CODEX_URL = "https://chatgpt.com/backend-api/codex/responses";
 const SSE = [
@@ -78,6 +78,38 @@ describe("createCodexOAuthFetch", () => {
       }),
     });
     expect(response.status).toBe(200);
+  });
+
+  it("Request 输入保留原有 Authorization", async () => {
+    let seenAuthorization: string | null = null;
+    const inner = vi.fn(async (input: RequestInfo | URL) => {
+      if (input instanceof Request) seenAuthorization = input.headers.get("authorization");
+      return new Response(SSE, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      });
+    });
+    const wrapped = createCodexOAuthFetch(inner);
+    const request = new Request(CODEX_URL, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer host-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ model: "gpt-6-astra", stream: true, input: [] }),
+    });
+    const response = await wrapped(request);
+    expect(response.status).toBe(200);
+    expect(seenAuthorization).toBe("Bearer host-token");
+  });
+
+  it("只承认严格的 Codex baseURL", () => {
+    expect(isCodexEndpointUrl("https://chatgpt.com/backend-api/codex")).toBe(true);
+    expect(isCodexEndpointUrl("https://chatgpt.com/backend-api/codex/")).toBe(true);
+    expect(isCodexEndpointUrl("https://chatgpt.com:8443/backend-api/codex")).toBe(false);
+    expect(isCodexEndpointUrl("https://chatgpt.com/backend-api/codex?x=1")).toBe(false);
+    expect(isCodexEndpointUrl("https://user:pass@chatgpt.com/backend-api/codex")).toBe(false);
+    expect(isCodexEndpointUrl("https://evil.example/backend-api/codex")).toBe(false);
   });
 
   it("上游错误保持状态码，不改写正文", async () => {

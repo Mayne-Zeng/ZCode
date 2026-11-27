@@ -15,7 +15,18 @@ export function isAllowedCodexBaseUrl(baseUrl: string | null | undefined): boole
   if (typeof baseUrl !== "string" || baseUrl.trim().length === 0) return false;
   try {
     const url = new URL(baseUrl.trim());
-    if (url.protocol !== "https:" || url.hostname !== CODEX_RESPONSES_ORIGIN) return false;
+    // url.host 含端口：chatgpt.com:8443 也必须拒绝；query/hash/userinfo 会让 CLI
+    // 拼出的 /responses 路径失真，同样不属于固定端点。
+    if (
+      url.protocol !== "https:" ||
+      url.host !== CODEX_RESPONSES_ORIGIN ||
+      url.username !== "" ||
+      url.password !== "" ||
+      url.search !== "" ||
+      url.hash !== ""
+    ) {
+      return false;
+    }
     return url.pathname.replace(/\/+$/u, "") === CODEX_RESPONSES_PATH;
   } catch {
     return false;

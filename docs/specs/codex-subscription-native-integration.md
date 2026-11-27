@@ -84,17 +84,22 @@ interface CodexSubscriptionStatus {
   expiresAt?: number;
   errorMessage?: string;
 }
+```
+
+`pending` 覆盖“等待浏览器回调”和“token 交换在途”两个阶段；交换完成前不能提前变成
+`signed-out`，否则 UI 会停止轮询且不再触发自动同步。
 
 interface CodexSubscriptionService {
-  getStatus(): Promise<CodexSubscriptionStatus>;
-  startLogin(): Promise<{ authorizeUrl: string }>;
-  cancelLogin(): Promise<void>;
-  logout(): Promise<void>;
-  resolveRequestAuth(): Promise<{ apiKey: string; headers: Record<string, string> }>;
-  listModels(): Promise<CodexSubscriptionModel[]>;
-  dispose(): Promise<void>;
+getStatus(): Promise<CodexSubscriptionStatus>;
+startLogin(): Promise<{ authorizeUrl: string }>;
+cancelLogin(): Promise<void>;
+logout(): Promise<void>;
+resolveRequestAuth(): Promise<{ apiKey: string; headers: Record<string, string> }>;
+listModels(): Promise<CodexSubscriptionModel[]>;
+dispose(): Promise<void>;
 }
-```
+
+````
 
 ### 4.3 Renderer 能力
 
@@ -106,7 +111,7 @@ startCodexSubscriptionLogin(): Promise<{ authorizeUrl: string }>;
 cancelCodexSubscriptionLogin(): Promise<void>;
 logoutCodexSubscription(): Promise<void>;
 syncCodexSubscriptionModels(providerId: ProviderId): Promise<ProviderSettingsView>;
-```
+````
 
 远端 Host 未装配该能力时，状态返回 `supported:false`，其它方法抛出明确错误；UI 隐藏入口。
 
@@ -115,7 +120,7 @@ syncCodexSubscriptionModels(providerId: ProviderId): Promise<ProviderSettingsVie
 - `access.type === "codex-oauth"` 的模型视为 runtime-auth 模型：
   - 请求前通过既有 `ProviderRuntimeHeadersPort` 向 Host 请求；
   - Host 返回 `requestAuth = { apiKey: accessToken, headers: { "chatgpt-account-id", "OpenAI-Beta", "originator" } }`；
-  - CLI 不读取、不持久化 token。
+  - CLI 不读取、不持久化 token；应用 requestAuth 前再次断言 Base URL 是固定 Codex 端点。
 - Host 侧校验顺序：Provider 存在 → `access.type === "codex-oauth"` → `baseUrl` 在允许前缀内 →
   解析 token。任一步不通过都返回不可用，不降级为静态 API Key。
 
@@ -148,6 +153,7 @@ Renderer                Agent CLI                  Local Host
 - 模型元数据来自目录：`context_window`、`max_output_tokens`、`supported_reasoning_levels`、
   `input_modalities`；缺省上下文 272000、最大输出 128000。
 - 推理档位直接使用目录 effort，映射到 `reasoning.effort`；非推理模型写空 patch。
+- 登录后的自动同步只在 Provider 尚无模型时执行；已有模型时保留用户配置，避免无提示覆盖。
 - 目录里的 `ultra` 是 Codex 执行/速度预设，不是合法的 `reasoning.effort`；同步时过滤，只有 `ultra` 时退到 `max`，请求层也做同样的兜底。
 - 用户手动改过的模型元数据会在同步时被覆盖，README/UI 需提示。
 
@@ -176,8 +182,10 @@ Renderer                Agent CLI                  Local Host
    `desktop-local` Host 装配；远端 workspace、共享 Server 和独立 CLI 不显示该入口。
 2. 设置 → Model Provider → 添加供应商 → 「使用 ChatGPT 订阅」。
 3. 点击「登录 ChatGPT」；Host 在 `127.0.0.1:1455` 启动一次性回调并打开系统浏览器。
-4. 登录成功后 UI 自动同步一次模型；之后可手动「同步模型」。
+4. 登录成功后，仅当该 Provider 还没有模型时 UI 自动同步一次；已有模型时跳过自动同步，提示手动同步（手动同步会覆盖当前模型配置）。
 5. 在模型选择器中选择账号实际可用的 Codex 模型。
+
+登录能力只在桌面客户端提供：手机/网页可以查看状态、同步和退出，但不能接收本机 `1455` OAuth 回调，登录按钮会提示改用桌面端。
 
 排障：
 
