@@ -11,7 +11,9 @@ import {
   type ProviderId,
   type ProviderSettingsFacade,
   type ProviderSettingsCreationResult,
+  type ProviderSettingsProviderView,
   type ModelConfigResolution,
+  type ProviderApiType,
   type ProviderSettingsView,
   type ResolveModelConfigInput,
   type SavePersonalModelDraftInput,
@@ -24,6 +26,7 @@ import {
   type CodexSubscriptionStatus,
   isAllowedCodexBaseUrl,
 } from "./codexSubscriptionTypes.js";
+import type { ProviderCatalogModel, ProviderModelCatalogFetcher } from "./providerModelCatalog.js";
 
 export type {
   ProviderSettingsProviderView,
@@ -75,6 +78,85 @@ function codexModelConfigObject(model: CodexSubscriptionModel): ModelConfigObjec
   };
 }
 
+export interface ProviderModelSyncCandidate {
+  readonly modelId: ModelId;
+  /** 本地已经有同名模型（Built-in 或 Personal）；UI 置灰且不默认勾选。 */
+  readonly alreadyConfigured: boolean;
+}
+
+export interface ProviderModelSyncPreview {
+  readonly providerId: ProviderId;
+  readonly apiType: ProviderApiType;
+  /** 仅用于弹窗展示，不包含 API Key。 */
+  readonly baseUrl: string;
+  readonly models: readonly ProviderModelSyncCandidate[];
+}
+
+export interface ProviderModelSyncResult {
+  readonly view: ProviderSettingsView;
+  readonly added: number;
+  readonly skipped: number;
+}
+
+interface ProviderModelSyncTarget {
+  readonly provider: ProviderSettingsProviderView;
+  readonly apiType: ProviderApiType;
+  readonly baseUrl: string;
+  readonly apiKey: string;
+}
+
+/**
+ * 同步只接受 Host 自己 Registry 事实里的已保存配置：Renderer 不能传 URL 或 Key，
+ * 避免把 API Key 带到任意端点。
+ */
+function resolveProviderModelSyncTarget(
+  facade: ProviderSettingsFacade,
+  providerId: ProviderId,
+): ProviderModelSyncTarget {
+  const provider = facade.getView().providers.find((item) => item.providerId === providerId);
+  if (!provider) throw new Error(`Provider 不存在: ${providerId}`);
+  const access = provider.effectiveConfig.access;
+  if (!access || (access.type !== "api-key" && access.type !== "zhipu-coding-plan-api-key")) {
+    throw new Error("该供应商使用账号接入，不支持从端点同步模型");
+  }
+  const api = provider.effectiveConfig.api;
+  const baseUrl = api?.baseUrl?.trim() ?? "";
+  if (!api?.type || !baseUrl) {
+    throw new Error("同步模型前请先保存 Base URL 与 API 格式");
+  }
+  const apiKey = access.apiKey?.trim() ?? "";
+  if (!apiKey) throw new Error("同步模型前请先保存 API Key");
+  return { provider, apiType: api.type, baseUrl, apiKey };
+}
+
+function isCatalogModelCompatible(model: ProviderCatalogModel, apiType: ProviderApiType): boolean {
+  // 端点没有声明 supported_endpoint_types 时不过滤；声明了就必须包含当前格式。
+  return model.apiFormats === undefined || model.apiFormats.includes(apiType);
+}
+
+/** 端点返回的元数据只覆盖它明确提供的字段；其余继续由推荐规则补齐。 */
+function catalogModelConfigObject(model: ProviderCatalogModel): ModelConfigObject {
+  const properties: Record<string, unknown> = {};
+  if (model.contextWindow !== undefined) properties.contextWindow = model.contextWindow;
+  if (model.inputModalities !== undefined) {
+    properties.inputFormat = {
+      supportsText: true,
+      supportsImage: model.inputModalities.includes("image"),
+      supportsVideo: model.inputModalities.includes("video"),
+      supportsAudio: model.inputModalities.includes("audio"),
+      supportsPdf: model.inputModalities.includes("pdf"),
+    };
+  }
+  const optionSpecs: Record<string, unknown> = {};
+  if (model.maxOutputTokens !== undefined) {
+    optionSpecs.maxOutputTokens = { max: model.maxOutputTokens };
+  }
+  return {
+    ...(Object.keys(properties).length > 0 ? { properties } : {}),
+    ...(Object.keys(optionSpecs).length > 0 ? { optionSpecs } : {}),
+  };
+}
+
 export interface IProviderSettingsService {
   readonly onDidChange: Event<ProviderSettingsView>;
   getView(): Promise<ProviderSettingsView>;
@@ -121,6 +203,13 @@ export interface IProviderSettingsService {
   cancelCodexSubscriptionLogin(): Promise<void>;
   logoutCodexSubscription(): Promise<void>;
   syncCodexSubscriptionModels(providerId: ProviderId): Promise<ProviderSettingsView>;
+  /** 从已保存的 Base URL + API Key 读取端点模型目录；只返回候选，不写入。 */
+  fetchProviderModels(providerId: ProviderId): Promise<ProviderModelSyncPreview>;
+  /** 重新读取目录并把选中的新模型批量写入个人模型列表；只增不删。 */
+  syncProviderModels(
+    providerId: ProviderId,
+    modelIds?: readonly ModelId[],
+  ): Promise<ProviderModelSyncResult>;
 }
 
 export const IProviderSettingsService = createServiceDescriptor<IProviderSettingsService>(
@@ -164,6 +253,7 @@ export function createProviderSettingsService(
   ensureReady: () => Promise<void> = async () => {},
   testConnectivity?: ProviderSettingsConnectivityTester,
   codexSubscription?: CodexSubscriptionSettingsPort,
+  modelCatalog?: ProviderModelCatalogFetcher,
 ): IProviderSettingsService {
   return {
     onDidChange: toEvent((listener) => facade.onDidChange(listener)),
@@ -311,7 +401,78 @@ export function createProviderSettingsService(
         })),
       );
     },
+    fetchProviderModels: async (providerId) => {
+      await ensureReady();
+      const listModels = requireModelCatalog();
+      const target = await resolveCatalogTarget(providerId);
+      const models = await listModels({
+        apiType: target.apiType,
+        baseUrl: target.baseUrl,
+        apiKey: target.apiKey,
+      });
+      const existing = new Set(target.provider.models.map((model) => model.modelId));
+      return {
+        providerId,
+        apiType: target.apiType,
+        baseUrl: target.baseUrl,
+        models: models
+          .filter((model) => isCatalogModelCompatible(model, target.apiType))
+          .map((model) => ({
+            modelId: model.modelId,
+            alreadyConfigured: existing.has(model.modelId),
+          })),
+      };
+    },
+    syncProviderModels: async (providerId, modelIds) => {
+      await ensureReady();
+      const listModels = requireModelCatalog();
+      const target = await resolveCatalogTarget(providerId);
+      // 重新拉取目录：Renderer 只提交勾选的 ID，不提交 URL、Key 或配置。
+      const catalogModels = await listModels({
+        apiType: target.apiType,
+        baseUrl: target.baseUrl,
+        apiKey: target.apiKey,
+      });
+      const requested = modelIds
+        ? new Set(modelIds.map((modelId) => modelId.trim()).filter(Boolean))
+        : null;
+      const existing = new Set(target.provider.models.map((model) => model.modelId));
+      const candidates = catalogModels.filter(
+        (model) => isCatalogModelCompatible(model, target.apiType) && !existing.has(model.modelId),
+      );
+      const toAdd = requested
+        ? candidates.filter((model) => requested.has(model.modelId))
+        : candidates;
+      const skipped = requested
+        ? Math.max(requested.size - toAdd.length, 0)
+        : catalogModels.length - candidates.length;
+      if (toAdd.length === 0) {
+        return { view: facade.getView(), added: 0, skipped };
+      }
+      const view = await facade.addPersonalModels(
+        providerId,
+        toAdd.map((model) => ({
+          modelId: model.modelId,
+          config: catalogModelConfigObject(model),
+        })),
+        // 推荐模式：内置模型匹配规则补齐参数，端点元数据作为稀疏覆盖。
+        true,
+      );
+      return { view, added: toAdd.length, skipped };
+    },
   };
+
+  async function resolveCatalogTarget(providerId: ProviderId): Promise<ProviderModelSyncTarget> {
+    await facade.waitForProviderOperations(providerId);
+    return resolveProviderModelSyncTarget(facade, providerId);
+  }
+
+  function requireModelCatalog(): ProviderModelCatalogFetcher {
+    if (!modelCatalog) {
+      throw new Error("当前 Environment 未装配模型目录同步能力");
+    }
+    return modelCatalog;
+  }
 }
 
 export function createModelSelectionService(

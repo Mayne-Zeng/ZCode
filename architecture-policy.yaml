@@ -2645,3 +2645,13 @@ exceptions:
     paths:
       - apps/zcode-cli/packages/adapters/src/model/codex-oauth-fetch.ts
     reason: Codex 后端固定无状态流式，且非流式辅助调用需要把 SSE 聚合回 JSON（docs/specs/codex-subscription-native-integration.md §4.4）；该 fetch 只被已有 unmanaged 的 model-execution 在 codex-oauth 分支装配，不新增凭据来源或模块边界，接管整个 zcode-cli 不在本次范围内。
+  - id: provider-model-sync-catalog-service
+    rule: unmanaged-new-file
+    paths:
+      - packages/services/src/model-provider/providerModelCatalog.ts
+    reason: 自定义供应商模型同步只新增一个端点目录探测器（docs/specs/provider-model-sync.md §4.3），由既有 provider facade 服务在 Host 内调用，复用 hostApiNetworkTransport 与已保存 Provider 配置；不新增协议频道或状态 owner，接管整个 services 未受管模块不在本次范围内。
+  - id: provider-model-sync-dialog-ui
+    rule: unmanaged-new-file
+    paths:
+      - packages/ui/src/settings/model-provider-section/ProviderModelSyncDialog.tsx
+    reason: 设置页同步弹窗只做候选勾选与搜索（docs/specs/provider-model-sync.md §5），通过既有 IProviderSettingsService 拉取与写入模型，不接触 Base URL、API Key 或 Provider 配置写入路径，接管整个 ui 未受管模块不在本次范围内。

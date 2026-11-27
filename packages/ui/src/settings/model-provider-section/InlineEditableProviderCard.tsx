@@ -854,7 +854,9 @@ export function InlineEditableProviderCard({
           providerName={getProviderFormLabel(provider)}
           providerEnabled={provider.enabled}
           providerAccess={provider.config.access}
+          providerBaseUrl={baseUrlValue}
           models={models}
+          onBeforeSyncModels={() => commitPendingDraft("sync-models")}
           onTestModel={onTestModel ? handleTestModel : undefined}
           onModelCommit={handleModelCommit}
           onModelEnabledChange={handleModelEnabledChange}

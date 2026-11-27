@@ -7,6 +7,9 @@ export {
   type CodexSubscriptionSettingsPort,
   type ModelSelectionView,
   type ModelSelectionViewInput,
+  type ProviderModelSyncCandidate,
+  type ProviderModelSyncPreview,
+  type ProviderModelSyncResult,
   type ProviderSettingsProviderView,
   type ProviderSettingsView,
 } from "./model-provider/providerFacadeServices.js";

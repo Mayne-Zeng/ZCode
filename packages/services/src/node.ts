@@ -537,6 +537,7 @@ import {
   createProviderRuntimeFromConfigRuntime,
   type ProviderRuntime,
 } from "./model-provider/providerRuntime.js";
+import { createProviderModelCatalogFetcher } from "./model-provider/providerModelCatalog.js";
 import {
   IModelSelectionService,
   IProviderSettingsService,
@@ -1789,6 +1790,10 @@ export function createLocalServices(options: {
     disposeModelSelectionConfiguredDefaultSource: () =>
       modelSelectionConfiguredDefaultSource.dispose(),
     codexSubscription: codexSubscriptionService,
+    // 模型目录探测复用 Host 的代理/No Proxy/自定义 CA 选路；API Key 只在 Host 内使用。
+    modelCatalog: createProviderModelCatalogFetcher({
+      fetchImpl: hostApiNetworkTransport.fetch,
+    }),
     testConnectivity: createProviderSettingsConnectivityTester({
       testModelConnectivity: async (input) => {
         if (!providerConnectivityAgentService) {

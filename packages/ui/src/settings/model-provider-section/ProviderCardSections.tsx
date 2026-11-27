@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- 模型供应商卡片仍在迁移期集中维护多个紧耦合区块，后续拆分时再移除。 */
 import {
   useCallback,
+  useEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -11,7 +13,9 @@ import type {
   ProviderSettingsFormModel,
 } from "@/lib/providerSettingsFormTypes.js";
 import type { ModelConnectivityResult } from "@zcode/shared";
-import type { ProviderApiType } from "@zcode/provider";
+import type { ProviderApiType, ProviderConfigObject } from "@zcode/provider";
+import { isApiKeyAccess } from "@zcode/provider";
+import type { ProviderModelSyncPreview } from "@zcode/services";
 import {
   TID_MODEL_PROVIDER_ADD_MODEL_BUTTON,
   TID_MODEL_PROVIDER_BASE_URL_INPUT,
@@ -19,9 +23,19 @@ import {
   TID_MODEL_PROVIDER_MODEL_INPUT,
   TID_MODEL_PROVIDER_NAME_EDIT_BUTTON,
   TID_MODEL_PROVIDER_NAME_INPUT,
+  TID_MODEL_PROVIDER_SYNC_MODELS_BUTTON,
   testId,
 } from "@zcode/shared/test-ids";
-import { InfoIcon, LockKeyholeIcon, Plus, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import {
+  InfoIcon,
+  LoaderCircle,
+  LockKeyholeIcon,
+  Plus,
+  Pencil,
+  RefreshCw,
+  Trash2,
+  MoreHorizontal,
+} from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { Input } from "@/components/ui/input.js";
 import {
@@ -39,6 +53,7 @@ import { ModelRowInput } from "./ProviderFormControls.js";
 import { PresetProviderApiKeyBanner } from "./PresetProviderApiKeyBanner.js";
 import { type ProviderModelDraftValues } from "@/settings/model-provider-section/ProviderModelMetadata.js";
 import { ProviderModelMetadataDialog } from "@/settings/model-provider-section/ProviderModelMetadataDialog.js";
+import { ProviderModelSyncDialog } from "@/settings/model-provider-section/ProviderModelSyncDialog.js";
 import {
   PROVIDER_CONNECTION_API_FORMATS,
   ProviderApiFormatSelect,
@@ -47,7 +62,6 @@ import {
 import { SortableProviderModelList } from "@/settings/model-provider-section/SortableProviderModelList.js";
 import { useProviderModelDraft } from "@/settings/model-provider-section/useProviderModelDraft.js";
 import { ProviderLogo } from "@/settings/model-provider-section/ProviderLogo.js";
-import type { ProviderConfigObject } from "@zcode/provider";
 
 export {
   resolveProviderConnectionApiFormatDisplayLabel,
@@ -347,12 +361,18 @@ function createEmptyModel(): ProviderSettingsFormModel {
   };
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function ProviderModelsSection({
   providerId,
   providerName,
   providerEnabled = true,
   providerAccess,
+  providerBaseUrl,
   models,
+  onBeforeSyncModels,
   onTestModel,
   onModelCommit,
   onModelEnabledChange,
@@ -365,11 +385,13 @@ export function ProviderModelsSection({
   providerName?: string;
   providerEnabled?: boolean;
   providerAccess?: ProviderConfigObject["access"];
+  providerBaseUrl?: string;
   models: ProviderSettingsFormModel[];
+  onBeforeSyncModels?: () => Promise<void>;
   onTestModel?: (model: string) => Promise<ModelConnectivityResult>;
   onModelCommit: (
     originalModelId: string,
-    model: ProviderSettingsFormModel,
+    providerSettingsFormModel: ProviderSettingsFormModel,
     basedOnRevision: number,
   ) => void | Promise<void>;
   onDeleteModel: (modelId: string) => void;
@@ -382,6 +404,20 @@ export function ProviderModelsSection({
   const { providerSettingsService } = useServices();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addSaving, setAddSaving] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncSaving, setSyncSaving] = useState(false);
+  const [syncPreview, setSyncPreview] = useState<ProviderModelSyncPreview | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const addSavingRef = useRef(false);
   const [addCommitError, setAddCommitError] = useState<string | null>(null);
   const [addModel] = useState(createEmptyModel);
@@ -468,23 +504,105 @@ export function ProviderModelsSection({
       })
     : null;
 
+  const canSyncModels = isApiKeyAccess(providerAccess);
+  const trimmedBaseUrl = providerBaseUrl?.trim() ?? "";
+  const syncBusy = syncLoading || syncSaving;
+  // 稳定空数组：弹窗按 models 身份初始化勾选，避免每次渲染重置选择。
+  const syncCandidates = useMemo(() => syncPreview?.models ?? [], [syncPreview]);
+
+  const openSyncDialog = useCallback(async () => {
+    if (syncBusy) return;
+    setSyncError(null);
+    setSyncMessage(null);
+    setSyncLoading(true);
+    try {
+      // 先落盘 Provider 草稿：Host 同步只读取已保存的 Base URL / API Key。
+      await onBeforeSyncModels?.();
+      const preview = await providerSettingsService.fetchProviderModels(providerId);
+      if (!mountedRef.current) return;
+      setSyncPreview(preview);
+      setSyncOpen(true);
+    } catch (error) {
+      if (mountedRef.current) setSyncError(errorMessage(error));
+    } finally {
+      if (mountedRef.current) setSyncLoading(false);
+    }
+  }, [onBeforeSyncModels, providerId, providerSettingsService, syncBusy]);
+
+  const handleSyncConfirm = useCallback(
+    async (modelIds: readonly string[]) => {
+      if (syncSaving) return;
+      setSyncSaving(true);
+      setSyncError(null);
+      try {
+        const result = await providerSettingsService.syncProviderModels(providerId, [...modelIds]);
+        if (!mountedRef.current) return;
+        setSyncOpen(false);
+        setSyncMessage(
+          result.added > 0
+            ? intl.formatMessage(
+                { id: "settings.modelProvider.syncModelsAdded" },
+                { count: result.added },
+              )
+            : intl.formatMessage({ id: "settings.modelProvider.syncModelsNoChanges" }),
+        );
+      } catch (error) {
+        if (mountedRef.current) setSyncError(errorMessage(error));
+      } finally {
+        if (mountedRef.current) setSyncSaving(false);
+      }
+    },
+    [intl, providerId, providerSettingsService, syncSaving],
+  );
+
   return (
     <div>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <span className="text-ui-base text-foreground-subtle">
           {intl.formatMessage({ id: "settings.modelProvider.models" })}
         </span>
-        <Button
-          type="button"
-          variant="secondary"
-          size="default"
-          className="rounded-lg"
-          data-testid={TID_MODEL_PROVIDER_ADD_MODEL_BUTTON}
-          onClick={openAddDialog}
-        >
-          <Plus data-icon="inline-start" aria-hidden="true" />
-          {intl.formatMessage({ id: "settings.modelProvider.addModel" })}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {canSyncModels ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="default"
+              className="rounded-lg"
+              data-testid={TID_MODEL_PROVIDER_SYNC_MODELS_BUTTON}
+              disabled={syncBusy || trimmedBaseUrl.length === 0}
+              title={
+                trimmedBaseUrl.length === 0
+                  ? intl.formatMessage({
+                      id: "settings.modelProvider.syncModelsNeedsEndpoint",
+                    })
+                  : undefined
+              }
+              onClick={() => void openSyncDialog()}
+            >
+              {syncLoading ? (
+                <LoaderCircle
+                  data-icon="inline-start"
+                  className="animate-spin"
+                  aria-hidden="true"
+                />
+              ) : (
+                <RefreshCw data-icon="inline-start" aria-hidden="true" />
+              )}
+              {intl.formatMessage({ id: "settings.modelProvider.syncModels" })}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="secondary"
+            size="default"
+            className="rounded-lg"
+            data-testid={TID_MODEL_PROVIDER_ADD_MODEL_BUTTON}
+            onClick={openAddDialog}
+          >
+            <Plus data-icon="inline-start" aria-hidden="true" />
+            {intl.formatMessage({ id: "settings.modelProvider.addModel" })}
+          </Button>
+        </div>
       </div>
       {models.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-input-border bg-input">
@@ -552,6 +670,28 @@ export function ProviderModelsSection({
           {intl.formatMessage({ id: "settings.modelProvider.modelsEmpty" })}
         </div>
       )}
+      {syncMessage ? (
+        <p className="mt-1 text-ui-base text-foreground-subtle">{syncMessage}</p>
+      ) : null}
+      {syncError && !syncOpen ? (
+        <p role="alert" className="mt-1 text-ui-sm break-words text-destructive">
+          {syncError}
+        </p>
+      ) : null}
+      {canSyncModels ? (
+        <ProviderModelSyncDialog
+          open={syncOpen}
+          baseUrl={syncPreview?.baseUrl ?? trimmedBaseUrl}
+          models={syncCandidates}
+          saving={syncSaving}
+          error={syncError}
+          onOpenChange={(open) => {
+            setSyncOpen(open);
+            if (!open) setSyncError(null);
+          }}
+          onConfirm={handleSyncConfirm}
+        />
+      ) : null}
       <>
         <ProviderModelMetadataDialog
           onRestore={() => {

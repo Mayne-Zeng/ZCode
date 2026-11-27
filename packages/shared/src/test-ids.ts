@@ -558,6 +558,20 @@ export const TID_MODEL_PROVIDER_MODEL_INPUT = "model-provider-model-input";
 export const TID_MODEL_PROVIDER_MODEL_DELETE_BUTTON = "model-provider-model-delete-button";
 /** 模型供应商添加模型按钮 */
 export const TID_MODEL_PROVIDER_ADD_MODEL_BUTTON = "model-provider-add-model-button";
+/** 模型供应商从端点同步模型按钮 */
+export const TID_MODEL_PROVIDER_SYNC_MODELS_BUTTON = "model-provider-sync-models-button";
+/** 模型同步选择弹窗 */
+export const TID_MODEL_PROVIDER_SYNC_MODELS_DIALOG = "model-provider-sync-models-dialog";
+/** 模型同步选择弹窗搜索框 */
+export const TID_MODEL_PROVIDER_SYNC_MODELS_SEARCH = "model-provider-sync-models-search";
+/** 模型同步选择弹窗全选/取消全选 */
+export const TID_MODEL_PROVIDER_SYNC_MODELS_SELECT_ALL = "model-provider-sync-models-select-all";
+/** 模型同步候选行（动态后缀为 modelId） */
+export const TID_MODEL_PROVIDER_SYNC_MODELS_ITEM = "model-provider-sync-models-item";
+/** 模型同步确认按钮 */
+export const TID_MODEL_PROVIDER_SYNC_MODELS_CONFIRM = "model-provider-sync-models-confirm";
+/** 模型同步取消按钮 */
+export const TID_MODEL_PROVIDER_SYNC_MODELS_CANCEL = "model-provider-sync-models-cancel";
 
 // Chat Toolbar
 /** 聊天工具栏模型选择按钮 */

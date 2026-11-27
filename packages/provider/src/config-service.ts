@@ -326,8 +326,37 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
     membership?: ProviderModelMembership,
     useRecommendedConfig?: boolean,
   ): Promise<ProviderConfigLayerSnapshot> {
+    return this.addPersonalModels(
+      providerId,
+      [{ modelId, config }],
+      membership,
+      useRecommendedConfig,
+    );
+  }
+
+  /**
+   * 模型目录同步一次写入多个模型：成员、顺序与规则共享同一次 Personal 事务，
+   * 避免逐个模型写入产生多次 Registry 广播和部分成功。
+   */
+  async addPersonalModels(
+    providerId: ProviderId,
+    models: readonly { readonly modelId: ModelId; readonly config: ModelConfig }[],
+    membership?: ProviderModelMembership,
+    useRecommendedConfig?: boolean,
+  ): Promise<ProviderConfigLayerSnapshot> {
     const normalizedProviderId = normalizeId("providerId", providerId);
-    const normalizedModelId = normalizeId("modelId", modelId);
+    if (models.length === 0) return this.#personalRepository.read();
+    const normalizedModels = models.map((model) => ({
+      modelId: normalizeId("modelId", model.modelId),
+      config: model.config,
+    }));
+    const seenModelIds = new Set<string>();
+    for (const model of normalizedModels) {
+      if (seenModelIds.has(model.modelId)) {
+        throw new Error(`Model 重复: ${normalizedProviderId}/${model.modelId}`);
+      }
+      seenModelIds.add(model.modelId);
+    }
     const zcodeBuiltin = await this.#zcodeBuiltinSource.read();
     return this.#updatePersonal((current) => {
       assertMembershipCurrent(membership, normalizedProviderId, current);
@@ -335,31 +364,31 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       const builtinModelIds =
         membership?.inheritedModelIds ??
         resolveProviderBuiltinModelIds(zcodeBuiltin, current.providers, normalizedProviderId);
-      if (builtinModelIds.includes(normalizedModelId)) {
-        throw new Error(`Model 已存在: ${normalizedProviderId}/${normalizedModelId}`);
-      }
       const currentModelIds = provider.personalModelIds ?? [];
-      if (currentModelIds.includes(normalizedModelId)) {
-        throw new Error(`Model 已存在: ${normalizedProviderId}/${normalizedModelId}`);
+      for (const model of normalizedModels) {
+        if (builtinModelIds.includes(model.modelId) || currentModelIds.includes(model.modelId)) {
+          throw new Error(`Model 已存在: ${normalizedProviderId}/${model.modelId}`);
+        }
+      }
+      const nextModelIds = [...currentModelIds, ...normalizedModels.map((model) => model.modelId)];
+      let rules = current.models;
+      for (const model of normalizedModels) {
+        rules = rules.setExact(
+          normalizedProviderId,
+          model.modelId,
+          model.config.overlay(new ModelConfig({ enabled: true })),
+          useRecommendedConfig,
+        );
       }
       return {
         providers: current.providers.set(
           normalizedProviderId,
-          provider.withPersonalModelIds([...currentModelIds, normalizedModelId]).withModelOrder(
+          provider.withPersonalModelIds(nextModelIds).withModelOrder(
             // 添加不能重新按成员名单排序，否则会丢掉用户已经保存的顺序。
-            normalizeModelOrder(
-              builtinModelIds,
-              [...currentModelIds, normalizedModelId],
-              provider.modelOrder ?? [],
-            ),
+            normalizeModelOrder(builtinModelIds, nextModelIds, provider.modelOrder ?? []),
           ),
         ),
-        models: current.models.setExact(
-          normalizedProviderId,
-          normalizedModelId,
-          config.overlay(new ModelConfig({ enabled: true })),
-          useRecommendedConfig,
-        ),
+        models: rules,
         providerOrder: current.providerOrder,
       };
     });

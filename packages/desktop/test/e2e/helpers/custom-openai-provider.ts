@@ -143,7 +143,7 @@ export async function refreshSeededOpenAIProvidersThroughSettings(
   await waitForWorkspaceApp(workspacePath, 30000);
 }
 
-async function openModelProviderSettings() {
+export async function openModelProviderSettings() {
   await clickTestIdByDom(TID_TASK_SETTINGS_BUTTON, {
     timeout: 15000,
     timeoutMsg: "没有找到设置入口按钮",
