@@ -1,0 +1,17 @@
+{
+  "name": "zcode-codex-subscription",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Use a ChatGPT/Codex subscription in ZCode through a local Responses gateway",
+  "bin": {
+    "codex-sub": "./src/cli.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.19"
+  }
+}
