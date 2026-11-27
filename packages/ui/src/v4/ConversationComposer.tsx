@@ -108,7 +108,10 @@ import {
   useVoiceInputShortcut,
   VoiceInputButton,
 } from "@/voice-input/index.js";
-import { useComposerInputPrediction } from "@/v4/composer/useComposerInputPrediction.js";
+import {
+  composerInputPredictionContentKey,
+  useComposerInputPrediction,
+} from "@/v4/composer/useComposerInputPrediction.js";
 import { ImagePreviewDialog } from "@/components/ai-elements/image-preview-dialog.js";
 import {
   ChatMediaAttachmentPreviewDialog,
@@ -809,12 +812,24 @@ function ConversationComposerImpl({
     inputApiRef.current?.appendText(text);
     inputApiRef.current?.focus();
   }, []);
+  // 触发键用会话内容指纹而不是 revision（spec D12）：运行时初始化/store recovery 会抬
+  // revision，但不代表对话内容前进；拿 revision 当键会在切会话时连续预测并反复替换 hint。
+  const composerInputPredictionContentKeyValue = useMemo(
+    () => composerInputPredictionContentKey(snapshot),
+    [snapshot],
+  );
+  // 运行时初始化期间快照可能已存在但行/模型尚未稳定；ready 前不预测，避免用不完整状态
+  // 发起一次随后被替换的调用。旧快照没有该字段时按 ready 处理。
+  const composerInputPredictionSessionReady =
+    snapshot !== null && (snapshot.runtimeInitialization?.status ?? "ready") === "ready";
   const composerInputPrediction = useComposerInputPrediction({
     // composer 被禁用（reject/recovery 等模式）或正在提交（草稿已清、运行态尚未翻转的窗口）时不预测。
     enabled: composerInputPredictionEnabled && !disabled && !inputPending && !pending,
     sessionId,
     running: snapshot?.control.canStop === true,
     composerEmpty: !textPresence.trimmed,
+    sessionReady: composerInputPredictionSessionReady,
+    contentKey: composerInputPredictionContentKeyValue,
     revision: snapshot?.revision,
     snapshotSessionId: snapshot?.sessionId,
     workspacePath,
